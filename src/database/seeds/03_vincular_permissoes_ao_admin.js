@@ -1,0 +1,49 @@
+/**
+ * @param { import("knex").Knex } knex
+ * @returns { Promise<void> } 
+ */
+export async function seed(knex) {
+
+    const admins = await knex('usuarios')
+        .where({
+            nivel_acesso_id: 1, // ID do nível de acesso "admin"
+            deletado_em: null
+        })
+
+    const permissoes = await knex('permissoes').select('id');
+
+    if (admins.length == 0 || permissoes.length == 0) {
+        console.log('⚠️ Nenhum admin ou permissão encontrada para vincular.');
+        return;
+    }
+
+    const vinculosParaInserir = [];
+
+    for (const admin of admins) {
+
+        const permissoesAtuais = await knex('permissoes_usuarios')
+            .where({ usuario_id: admin.id })
+            .select('permissao_id');
+
+
+        const permissoesAtuaisIds = permissoesAtuais.map(item => item.permissao_id);
+
+        const novasPermissoes = permissoes
+            .filter(p => !permissoesAtuaisIds.includes(p.id))
+            .map(p => ({
+                usuario_id: admin.id,
+                permissao_id: p.id
+            }));
+
+        vinculosParaInserir.push(...novasPermissoes);
+    }
+
+    if (vinculosParaInserir.length > 0) {
+        await knex('permissoes_usuarios').insert(vinculosParaInserir);
+        console.log(`\n🟢 VÍNCULO DE ADMIN CONCLUÍDO`);
+        console.log(`✅ Foram adicionados ${vinculosParaInserir.length} novos vínculos de permissão.\n`);
+    } else {
+        console.log('\n✨ Todos os admins já possuem todas as permissões.\n');
+    }
+
+};

@@ -1,0 +1,69 @@
+npm install knex --save
+npm install pg
+npx knex init
+npx gitignore node
+npm install jsonwebtoken 
+npm install bcryptjs
+npm install express
+npm install nodemon
+
+
+criar migration: npx knex migrate:make 'nome_da_migratio'
+rodar migration: npx knex migrate:latest
+
+criar seed: npx knex seed:make 'nome_do_seed'
+rodar seed: npx knex seed:run
+npx knex seed:run --specific='vincular_permissoes_ao_admin.js'
+
+
+rate-limit 
+helmet
+bcrypt
+jwt
+cors
+resend
+
+
+migration
+
+seeds
+Seeds de Banco de Dados
+Seeds (Sementes) são scripts automatizados responsáveis por popular o banco de dados com dados iniciais ou de teste. Enquanto as Migrations cuidam da "planta" (estrutura), os Seeds cuidam do "recheio" (conteúdo).
+
+1. Objetivo Principal
+O propósito do Seeding é garantir que a aplicação tenha um estado inicial funcional. Sem os seeds, após rodar as migrations, o banco estaria vazio e o sistema poderia nem permitir o login (por falta de níveis de acesso cadastrados, por exemplo).
+
+2. Principais Utilidades
+Configurações de Sistema: Insere dados obrigatórios que não mudam com frequência, como Níveis de Acesso (Admin, Atendente), Formas de Pagamento e Categorias de Alimentos.
+
+Padronização da Equipe: Garante que todos os desenvolvedores do projeto (você e seus colegas) trabalhem com a mesma base de dados de teste.
+
+Agilidade no Desenvolvimento: Evita a tarefa repetitiva e manual de cadastrar itens toda vez que o banco de dados for resetado ou recriado.
+
+3. Diferenças Fundamentais
+Migrations: Definem as tabelas e colunas (Ex: CREATE TABLE usuarios). São o "esqueleto".
+
+Seeds: Definem os registros e valores (Ex: INSERT INTO usuarios). São a "vida" do sistema.
+
+4. Boas Práticas
+Idempotência: Scripts de seed geralmente limpam a tabela antes de inserir os dados para evitar registros duplicados caso o comando seja executado mais de uma vez.
+
+Ambientes: Podem ser usados para inserir dados reais em produção (apenas configurações básicas) ou dados "fictícios" em desenvolvimento (para testar o layout da dashboard).
+
+
+
+usuarios
+{
+    "email": "email@teste.com",
+    "senha": "Senhaforte123@"
+}
+
+{
+    "email": "elton@teste.com",
+    "senha": "Senhaforte456@"
+}
+
+{
+    "email": "maria@teste.com",
+    "senha": "Senhaforte789@"
+}
