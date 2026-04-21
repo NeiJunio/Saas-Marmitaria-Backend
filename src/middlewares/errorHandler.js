@@ -3,6 +3,8 @@ export default function errorHandler(err, req, res, next) {
 
     const message = err.message || 'Erro interno no servidor';
 
+    const status = statusCode >= 500 ? 'error' : 'fail';
+
     console.error(`\n[${new Date().toISOString()}] ❌ Erro em ${req.method} ${req.url}`);
     console.error(`Mensagem: ${message}`);
 
@@ -12,7 +14,7 @@ export default function errorHandler(err, req, res, next) {
     console.error('--------------------------------------------------\n');
 
     return res.status(statusCode).json({
-        status: 'error',
+        status: status,
         message: message
     });
 }

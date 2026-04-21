@@ -8,7 +8,7 @@ export const login = async (req, res, next) => {
 
         if (!email || !senha) {
             return res.status(400).json({
-                status: 'error',
+                status: 'fail',
                 message: 'Email e Senha são obrigatórios'
             })
         }
@@ -28,14 +28,14 @@ export const login = async (req, res, next) => {
 
         if (!query) {
             return res.status(401).json({
-                status: 'error',
+                status: 'fail',
                 message: 'Email ou senha incorretos'
             })
         }
 
         if (query.ativo === false) {
             return res.status(403).json({
-                status: 'error',
+                status: 'fail',
                 message: 'Sua conta está suspensa. Contate o Administrador'
             })
         }
@@ -44,7 +44,7 @@ export const login = async (req, res, next) => {
 
         if (!senhaValida) {
             return res.status(401).json({
-                status: 'error',
+                status: 'fail',
                 message: 'E-mail ou senha inválidos.'
             });
         }
@@ -58,6 +58,14 @@ export const login = async (req, res, next) => {
             { expiresIn: '8h' }
         )
 
+        // Enviando cookie via HttpOnly
+        res.cookie('token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 1000 * 60 * 60 * 24 // 1 dia
+        });
+
         return res.status(200).json({
             status: 'success',
             message: 'Login realizado com sucesso',
@@ -66,8 +74,7 @@ export const login = async (req, res, next) => {
                     id: query.id,
                     nome: query.nome,
                     cargo: query.cargo
-                },
-                token
+                }
             }
         })
 

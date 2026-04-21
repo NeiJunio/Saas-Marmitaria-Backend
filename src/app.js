@@ -1,4 +1,5 @@
 import express from 'express';
+import cookieParser from 'cookie-parser';
 
 import usuariosRoutes from './routes/Usuarios.routes.js'
 import authRoutes from './routes/Auth.routes.js'
@@ -8,6 +9,7 @@ import errorHandler from './middlewares/errorHandler.js';
 const app = express();
 
 app.use(express.json());
+app.use(cookieParser());
 
 app.use('/usuarios', usuariosRoutes)
 app.use('/auth', authRoutes)

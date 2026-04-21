@@ -6,6 +6,7 @@ npm install jsonwebtoken
 npm install bcryptjs
 npm install express
 npm install nodemon
+npm install cookies-parser'
 
 
 criar migration: npx knex migrate:make 'nome_da_migratio'

@@ -21,28 +21,28 @@ export const criarUsuario = async (req, res, next) => {
 
         if (!nome || !email || !senha) {
             return res.status(400).json({
-                status: 'error',
+                status: 'fail',
                 message: 'Preencha todos os campos corretamente'
             })
         }
 
         if (email && !isValidEmail(email)) {
             return res.status(400).json({
-                status: 'error',
+                status: 'fail',
                 message: 'Email inválido'
             })
         }
 
         if (senha && !isValidPassword(senha)) {
             return res.status(400).json({
-                status: 'error',
+                status: 'fail',
                 message: 'A senha deve ter no mínimo 12 caracteres, contendo maiúsculas, minúsculas, números e caracteres especiais'
             })
         }
 
         if (!nivel_acesso_id) {
             return res.status(400).json({
-                status: "error",
+                status: "fail",
                 message: "O campo nivel_acesso_id é obrigatório."
             });
         }
@@ -53,7 +53,7 @@ export const criarUsuario = async (req, res, next) => {
 
         if (usuarioExiste) {
             return res.status(400).json({
-                status: 'error',
+                status: 'fail',
                 message: 'Este email já está em uso.'
             })
         }
