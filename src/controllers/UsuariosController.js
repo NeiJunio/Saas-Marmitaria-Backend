@@ -144,3 +144,11 @@ export const listarUsuarios = async (req, res, next) => {
         next(error);
     }
 }
+
+export const listarUsuarioPorId = async (req, res, next) => { 
+    try {
+        
+    } catch (error) {
+        
+    }
+}

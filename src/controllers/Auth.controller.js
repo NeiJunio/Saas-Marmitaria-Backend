@@ -2,6 +2,8 @@ import jwt from "jsonwebtoken";
 import connection from "../database/connection.js";
 import { comparePassword } from "../utils/password.utils.js";
 
+
+// LOGIN
 export const login = async (req, res, next) => {
     try {
         const { email, senha } = req.body;
@@ -58,12 +60,13 @@ export const login = async (req, res, next) => {
             { expiresIn: '8h' }
         )
 
-        // Enviando cookie via HttpOnly
+        const isProduction = process.env.NODE_ENV === 'production';
+
         res.cookie('token', token, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
-            maxAge: 1000 * 60 * 60 * 24 // 1 dia
+            secure: isProduction,                 // HTTPS em produção
+            sameSite: isProduction ? 'none' : 'lax', // necessário para frontend separado
+            maxAge: 1000 * 60 * 60 * 8            // 8 horas
         });
 
         return res.status(200).json({
@@ -82,3 +85,25 @@ export const login = async (req, res, next) => {
         next(error)
     }
 } 
+
+
+// LOGOUT
+export const logout = async (req, res, next) => {
+    try {
+        const isProduction = process.env.NODE_ENV === 'production';
+
+        // O clearCookie precisa das mesmas configurações de domínio/segurança que o res.cookie
+        res.clearCookie('token', {
+            httpOnly: true,
+            secure: isProduction,
+            sameSite: isProduction ? 'none' : 'lax',
+        });
+
+        return res.status(200).json({
+            status: 'success',
+            message: 'Logout realizado com sucesso. Até logo!'
+        });
+    } catch (error) {
+        next(error);
+    }
+};
