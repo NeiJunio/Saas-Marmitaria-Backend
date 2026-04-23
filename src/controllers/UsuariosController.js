@@ -145,10 +145,13 @@ export const listarUsuarios = async (req, res, next) => {
     }
 }
 
-export const listarUsuarioPorId = async (req, res, next) => { 
-    try {
+// export const listarUsuarioPorId = async (req, res, next) => { 
+//     try {
+//         const { id } = req.params;
+
+//         const query = await connection('usuarios')
+//         .where
+//     } catch (error) {
         
-    } catch (error) {
-        
-    }
-}
+//     }
+// }

@@ -20,7 +20,7 @@ export const login = async (req, res, next) => {
             .where('usuarios.email', email)
             .andWhere("usuarios.deletado_em", null)
             .select([
-                'usuarios.id',
+                'usuarios.id AS usuario_id',
                 'usuarios.nome',
                 'usuarios.senha_hash',
                 'usuarios.ativo',
@@ -53,7 +53,7 @@ export const login = async (req, res, next) => {
 
         const token = jwt.sign(
             {
-                id: query.id,
+                id: query.usuario_id,
                 cargo: query.cargo
             },
             process.env.JWT_SECRET,
@@ -74,7 +74,7 @@ export const login = async (req, res, next) => {
             message: 'Login realizado com sucesso',
             data: {
                 usuario: {
-                    id: query.id,
+                    id: query.usuario_id,
                     nome: query.nome,
                     cargo: query.cargo
                 }
@@ -84,7 +84,7 @@ export const login = async (req, res, next) => {
     } catch (error) {
         next(error)
     }
-} 
+}
 
 
 // LOGOUT
