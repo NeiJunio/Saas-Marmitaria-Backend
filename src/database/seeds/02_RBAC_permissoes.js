@@ -2,6 +2,9 @@
  * @param { import("knex").Knex } knex
  * @returns { Promise<void> } 
  */
+import chalk from 'chalk';
+import logSymbols from 'log-symbols';
+
 export async function seed(knex) {
     await knex('permissoes_usuarios').del();
     await knex('permissoes').del();
@@ -36,7 +39,7 @@ export async function seed(knex) {
     // 3. Insere apenas as permissões no banco
     await knex('permissoes').insert(listaPermissoes);
 
-    console.log(`\n🟢 SEED DE PERMISSÕES CONCLUÍDO`);
-    console.log(`✅ ${listaPermissoes.length} permissões cadastradas no catálogo.\n`);
+    console.log(`\n${logSymbols.success} ${chalk.green('SEED DE PERMISSÕES CONCLUÍDO')}`);
+    console.log(`${logSymbols.success} ${chalk.green(`${listaPermissoes.length} permissões cadastradas no catálogo.`)}\n`);
 
 };

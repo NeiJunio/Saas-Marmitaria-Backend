@@ -2,6 +2,9 @@
  * @param { import("knex").Knex } knex
  * @returns { Promise<void> } 
  */
+import chalk from 'chalk';
+import logSymbols from 'log-symbols';
+
 export async function seed(knex) {
 
     const admins = await knex('usuarios')
@@ -13,7 +16,7 @@ export async function seed(knex) {
     const permissoes = await knex('permissoes').select('id');
 
     if (admins.length == 0 || permissoes.length == 0) {
-        console.log('⚠️ Nenhum admin ou permissão encontrada para vincular.');
+        console.log(logSymbols.warning, chalk.yellow('Nenhum admin ou permissão encontrada para vincular.'));
         return;
     }
 
@@ -40,10 +43,10 @@ export async function seed(knex) {
 
     if (vinculosParaInserir.length > 0) {
         await knex('permissoes_usuarios').insert(vinculosParaInserir);
-        console.log(`\n🟢 VÍNCULO DE ADMIN CONCLUÍDO`);
-        console.log(`✅ Foram adicionados ${vinculosParaInserir.length} novos vínculos de permissão.\n`);
+        console.log(`\n${logSymbols.success} ${chalk.green('VÍNCULO DE ADMIN CONCLUÍDO')}`);
+        console.log(`${logSymbols.success} ${chalk.green(`Foram adicionados ${vinculosParaInserir.length} novos vínculos de permissão.`)}\n`);
     } else {
-        console.log('\n✨ Todos os admins já possuem todas as permissões.\n');
+        console.log(`\n${logSymbols.info} ${chalk.cyan('Todos os admins já possuem todas as permissões.')}\n`);
     }
 
 };

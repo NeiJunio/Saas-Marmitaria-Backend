@@ -7,6 +7,7 @@ npm install bcryptjs
 npm install express
 npm install nodemon
 npm install cookies-parser'
+npm install chalk log-symbols
 
 
 criar migration: npx knex migrate:make 'nome_da_migratio'
