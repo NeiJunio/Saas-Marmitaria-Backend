@@ -4,7 +4,7 @@ const options = {
     definition: {
         openapi: '3.0.0',
         info: {
-            title: 'SaaS Marmitaria - API GESTOOERP',
+            title: 'SaaS Marmitaria - Documentação API',
             version: '1.0.0',
             description: 'Documentação das rotas do sistema de gestão de marmitarias',
         },

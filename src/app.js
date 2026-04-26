@@ -44,7 +44,11 @@ app.use(cookieParser());
 //     next();
 // });
 
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+    swaggerOptions: {
+        withCredentials: true, // 👈 ESSENCIAL: Isso força o Swagger a enviar o cookie
+    },
+}));
 
 app.use('/usuarios', usuariosRoutes)
 app.use('/auth', authRoutes)

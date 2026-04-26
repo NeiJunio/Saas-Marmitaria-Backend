@@ -6,8 +6,10 @@ export const checkPermission = (permissaoRequerida) => {
         try {
 
             const usuarioId = req.usuario?.id;
+            console.log("usuario_id: ", usuarioId);
 
             const usuarioCargo = req.usuario?.cargo;
+            console.log("usuario_cargo: ", usuarioCargo);
 
             if (usuarioCargo === 'admin') {
                 return next();

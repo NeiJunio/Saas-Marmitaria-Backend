@@ -63,6 +63,8 @@ const router = Router();
  */
 router.post('/', criarUsuario);
 
+router.use(verifyToken);
+
 /**
  * @swagger
  * /usuarios:
