@@ -34,7 +34,11 @@ export async function seed(knex) {
 
         // Módulo: Relatórios
         { nome: 'relatorios.financeiro', descricao: 'Visualizar faturamento e lucros' },
-        { nome: 'relatorios.vendas', descricao: 'Visualizar estatísticas de vendas' }
+        { nome: 'relatorios.vendas', descricao: 'Visualizar estatísticas de vendas' },
+
+        {nome: 'permissoes.listar', descricao: 'Visualizar lista de todas as permissões do sistema'},
+        {nome: 'permissoes.visualizar', descricao: 'Visualizar quais permissões um usuário possui'},
+        {nome: 'permissoes.editar', descricao: 'Alterar as permissões de um usuário'}
     ];
 
     // 3. Insere apenas as permissões no banco

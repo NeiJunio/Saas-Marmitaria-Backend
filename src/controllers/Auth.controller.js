@@ -1,6 +1,6 @@
 import jwt from "jsonwebtoken";
 import connection from "../database/connection.js";
-import { comparePassword } from "../utils/password.utils.js";
+import { comparePassword } from "../utils/passwordUtils.js";
 
 
 // LOGIN
