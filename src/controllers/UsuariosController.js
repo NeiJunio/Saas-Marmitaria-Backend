@@ -15,7 +15,7 @@ function isValidPassword(password) {
 }
 
 
-
+// Criando usuário
 export const criarUsuario = async (req, res, next) => {
     try {
         const { nome, email, senha, nivel_acesso_id } = req.body;
@@ -69,6 +69,7 @@ export const criarUsuario = async (req, res, next) => {
     }
 }
 
+// Listando todos os usuários
 export const listarUsuarios = async (req, res, next) => {
     try {
         const {
@@ -78,7 +79,7 @@ export const listarUsuarios = async (req, res, next) => {
             // sort = 'usuarios.nome',
             sort = 'usuarios.id',
             order = 'ASC',
-            deletados = 'false'
+            deletados = 'all'
         } = req.query;
 
         const offset = (page - 1) * limit;
@@ -135,6 +136,7 @@ export const listarUsuarios = async (req, res, next) => {
     }
 }
 
+// Listando usuário pelo ID
 export const listarUsuarioPorId = async (req, res, next) => {
     try {
         const { id } = req.params;
@@ -178,6 +180,7 @@ export const listarUsuarioPorId = async (req, res, next) => {
     }
 }
 
+// Edição do usuário
 export const editarUsuario = async (req, res, next) => {
 
     const trx = await connection.transaction();
@@ -231,7 +234,7 @@ export const editarUsuario = async (req, res, next) => {
                 'ativo': ativo !== undefined ? ativo : usuarioExiste.ativo,
                 'atualizado_em': new Date()
             })
-            .returning(['usuarios.id', 'usuarios.nome', 'usuarios.email', 'usuarios.ativo'])
+            .returning(['id', 'nome', 'email', 'ativo'])
 
         // Log de auditoria
         await connection('logs')
@@ -266,4 +269,116 @@ export const editarUsuario = async (req, res, next) => {
 
     }
 
+}
+
+// Inativação do usuário
+export const inativarUsuario = async (req, res, next) => {
+
+    const trx = await connection.transaction()
+
+    try {
+        const { id } = req.params
+
+        const usuarioExiste = await connection('usuarios')
+            .transacting(trx)
+            .where('usuarios.id', id)
+            .whereNull('deletado_em')
+            .first()
+
+        if (!usuarioExiste) {
+            await trx.rollback()
+            lancarErro('Usuário não encontrado ou já se encontra inativo', 404);
+        }
+
+        const [usuario] = await connection('usuarios')
+            .transacting(trx)
+            .where('usuarios.id', id)
+            .update({
+                ativo: false,
+                deletado_em: new Date()
+            })
+            .returning(['nome'])
+
+        await connection('logs')
+            .transacting(trx)
+            .insert({
+                tipo: 'ACAO',
+                usuario_id: req.usuario.id,
+                metodo: req.method,
+                endpoint: req.originalUrl,
+                acao: 'USUARIOS.INATIVAR',
+                descricao: `${req.usuario.nome} inativou o acesso de ${usuario.nome}`,
+                payload: JSON.stringify({ id_afetado: id })
+            })
+
+        await trx.commit();
+        res.status(200).json({
+            status: 'success',
+            message: 'Usuário inativado com sucesso!'
+        });
+    } catch (error) {
+
+        await trx.rollback();
+
+        next(error);
+
+    }
+}
+
+
+// Reativação do usuário
+export const reativarUsuario = async (req, res, next) => {
+
+    const trx = await connection.transaction();
+
+    try {
+
+        const { id } = req.params;
+
+        const usuarioExiste = await connection('usuarios')
+            .transacting(trx)
+            .where('usuarios.id', id)
+            .whereNotNull('deletado_em')
+            .first()
+
+        if (!usuarioExiste) {
+
+            await trx.rollback()
+            
+            lancarErro('Usuário não encontrado ou já se encontra ativo', 404);
+
+        }
+
+        const [usuario] = await connection('usuarios')
+            .transacting(trx)
+            .where('usuarios.id', id)
+            .update({
+                ativo: true,
+                deletado_em: null
+            })
+            .returning(['nome'])
+
+        await connection('logs').transacting(trx).insert({
+            tipo: 'ACAO',
+            usuario_id: req.usuario.id,
+            metodo: req.method,
+            endpoint: req.originalUrl,
+            acao: 'USUARIOS.ATIVAR',
+            descricao: `${req.usuario.nome} reativou o acesso de ${usuario.nome}`,
+            payload: JSON.stringify({ id_afetado: id })
+        });
+
+        await trx.commit();
+
+        res.status(200).json({
+            status: 'success',
+            message: 'Usuário reativado com sucesso!'
+        });
+
+    } catch (error) {
+
+        await trx.rollback();
+
+        next(error);
+    }
 }

@@ -18,7 +18,7 @@ export const login = async (req, res, next) => {
         const query = await connection('usuarios')
             .join('niveis_acesso', 'usuarios.nivel_acesso_id', '=', 'niveis_acesso.id')
             .where('usuarios.email', email)
-            .andWhere("usuarios.deletado_em", null)
+            // .andWhere("usuarios.deletado_em", null)
             .select([
                 'usuarios.id AS usuario_id',
                 'usuarios.nome',
