@@ -6,6 +6,9 @@ import authRoutes from './routes/Auth.routes.js'
 
 import errorHandler from './middlewares/errorHandler.js';
 
+import swaggerUi from 'swagger-ui-express';
+import { swaggerSpec } from './config/swagger.js';
+
 import cors from 'cors';
 
 
@@ -40,6 +43,8 @@ app.use(cookieParser());
 //     console.log('REQ GLOBAL:', req.method, req.url);
 //     next();
 // });
+
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 app.use('/usuarios', usuariosRoutes)
 app.use('/auth', authRoutes)

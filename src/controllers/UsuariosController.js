@@ -3,17 +3,17 @@ import { hashPassword } from "../utils/passwordUtils.js";
 import { lancarErro } from "../utils/errorUtils.js";
 // import bcrypt from "bcryptjs";
 
-
+// Validador de email
 function isValidEmail(email) {
     const regex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     return regex.test(email);
 }
 
+// Validador de senha
 function isValidPassword(password) {
     const regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{12,}$/;
     return regex.test(password);
 }
-
 
 // Criando usuário
 export const criarUsuario = async (req, res, next) => {

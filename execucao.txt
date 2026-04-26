@@ -8,6 +8,7 @@ npm install express
 npm install nodemon
 npm install cookies-parser'
 npm install chalk log-symbols
+npm install swagger-ui-express swagger-jsdoc
 
 
 criar migration: npx knex migrate:make 'nome_da_migratio'
