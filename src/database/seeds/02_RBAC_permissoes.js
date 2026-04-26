@@ -16,6 +16,7 @@ export async function seed(knex) {
         { nome: 'usuarios.criar', descricao: 'Cadastrar novos funcionários' },
         { nome: 'usuarios.editar', descricao: 'Editar dados de funcionários' },
         { nome: 'usuarios.deletar', descricao: 'Remover funcionários do sistema' },
+        { nome: 'usuarios.visualizar', descricao: 'Visualizar detalhes do usuário' },
 
         // Módulo: Cardápio (Alimentos)
         { nome: 'cardapio.listar', descricao: 'Visualizar itens do cardápio' },

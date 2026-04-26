@@ -17,7 +17,7 @@ export const criarUsuario = async (req, res, next) => {
     try {
         const { nome, email, senha, nivel_acesso_id } = req.body;
 
-        console.log(req.body);
+        // console.log(req.body);
 
         if (!nome || !email || !senha) {
             return res.status(400).json({
@@ -145,13 +145,51 @@ export const listarUsuarios = async (req, res, next) => {
     }
 }
 
-// export const listarUsuarioPorId = async (req, res, next) => { 
-//     try {
-//         const { id } = req.params;
+export const listarUsuarioPorId = async (req, res, next) => {
+    try {
+        const { id } = req.params;
 
-//         const query = await connection('usuarios')
-//         .where
-//     } catch (error) {
-        
-//     }
-// }
+        if (!id) {
+            return res.status(400).json({
+                status: 'fail',
+                message: 'O campo id é obrigatório.'
+            })
+        }
+
+        const query = await connection('usuarios')
+            .join('niveis_acesso', 'usuarios.nivel_acesso_id', '=', 'niveis_acesso.id')
+            .where('usuarios.id', id)
+            .select([
+                'usuarios.id',
+                'usuarios.nome',
+                'usuarios.email',
+                'usuarios.senha_hash',
+                'usuarios.nivel_acesso_id',
+                'niveis_acesso.nome AS cargo',
+                'usuarios.ativo',
+                // 'usuarios.criado_em',
+                connection.raw(`
+                    TO_CHAR(usuarios.criado_em, 'DD/MM/YYYY HH24:MI:SS') AS criado_em,
+                    TO_CHAR(usuarios.atualizado_em, 'DD/MM/YYYY HH24:MI:SS') AS atualizado_em`),
+                'usuarios.deletado_em',
+            ])
+
+
+        if (!query || query.length === 0) {
+            return res.status(404).json({
+                status: 'fail',
+                message: 'Usuário não encontrado.'
+            })
+        }
+
+        const usuario = query[0];
+        delete usuario.senha_hash; // Remover a senha do resultado
+
+        res.status(200).json({
+            status: 'success',
+            data: usuario
+        })
+    } catch (error) {
+        next(error);
+    }
+}
