@@ -20,6 +20,7 @@ export const verifyToken = (req, res, next) => {
 
         req.usuario = {
             id: decoded.id,
+            nome:decoded.nome,
             cargo: decoded.cargo
         }
 

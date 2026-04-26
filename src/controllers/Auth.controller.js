@@ -54,6 +54,7 @@ export const login = async (req, res, next) => {
         const token = jwt.sign(
             {
                 id: query.usuario_id,
+                nome: query.nome,
                 cargo: query.cargo
             },
             process.env.JWT_SECRET,
@@ -67,6 +68,18 @@ export const login = async (req, res, next) => {
             secure: isProduction,                 // HTTPS em produção
             sameSite: isProduction ? 'none' : 'lax', // necessário para frontend separado
             maxAge: 1000 * 60 * 60 * 8            // 8 horas
+        });
+
+
+        // Log de Login (Opcional, mas muito bom para o SaaS)
+        await connection('logs').insert({
+            tipo: 'ACAO',
+            usuario_id: query.usuario_id,
+            metodo: 'POST',
+            endpoint: '/login',
+            acao: 'USUARIOS.LOGIN',
+            descricao: `O colaborador ${query.nome} realizou login no sistema.`,
+            payload: JSON.stringify({ ip: req.ip }) // Guardar o IP é uma boa prática
         });
 
         return res.status(200).json({

@@ -95,7 +95,7 @@ export const listarUsuarios = async (req, res, next) => {
                 'usuarios.criado_em',
                 'usuarios.deletado_em'
             ])
-            
+
 
         if (deletados === 'false') {
             query.whereNull('usuarios.deletado_em')
@@ -180,12 +180,15 @@ export const listarUsuarioPorId = async (req, res, next) => {
 
 export const editarUsuario = async (req, res, next) => {
 
+    const trx = await connection.transaction();
+
     try {
 
         const { id } = req.params;
         const { nome, email, nivel_acesso_id, ativo } = req.body;
 
         const usuarioExiste = await connection('usuarios')
+            .transacting(trx)
             .join('niveis_acesso', 'usuarios.nivel_acesso_id', '=', 'niveis_acesso.id')
             .where('usuarios.id', id)
             .whereNull('usuarios.deletado_em')
@@ -194,8 +197,6 @@ export const editarUsuario = async (req, res, next) => {
                 'niveis_acesso.nome as cargo'
             )
             .first()
-        console.log('LOGADO:', req.usuario.cargo);
-        console.log('ALVO:', usuarioExiste.cargo);
 
         if (!usuarioExiste) {
             lancarErro('Usuário não encontrado', 404);
@@ -210,6 +211,7 @@ export const editarUsuario = async (req, res, next) => {
 
         if (email && email.toLowerCase() !== usuarioExiste.email) {
             const emailConflitante = await connection('usuarios')
+                .transacting(trx)
                 .where('usuarios.email', email.toLowerCase())
                 .whereNot('usuarios.id', id)  // 👈 IMPORTANTE: Ignora o próprio usuário
                 .first();
@@ -219,7 +221,8 @@ export const editarUsuario = async (req, res, next) => {
             }
         }
 
-        const usuarioAtualizado = await connection('usuarios')
+        const [usuarioAtualizado] = await connection('usuarios')
+            .transacting(trx)
             .where('usuarios.id', id)
             .update({
                 'nome': nome || usuarioExiste.nome,
@@ -230,13 +233,37 @@ export const editarUsuario = async (req, res, next) => {
             })
             .returning(['usuarios.id', 'usuarios.nome', 'usuarios.email', 'usuarios.ativo'])
 
+        // Log de auditoria
+        await connection('logs')
+            .transacting(trx)
+            .insert({
+                tipo: 'ACAO',
+                usuario_id: req.usuario.id,
+                metodo: req.method,
+                endpoint: req.originalUrl,
+                acao: 'USUARIOS.EDITAR',
+                descricao: `O colaborador ${req.usuario.nome} editou os dados de ${usuarioAtualizado.nome} (ID: ${id})`,
+                payload: JSON.stringify({
+                    dados_enviados: req.body,
+                    usuario_agetado_id: id
+                })
+            })
+
+
+        await trx.commit();
+
         res.status(200).json({
             status: 'success',
+            message: 'Coladorador atualizado com sucesso',
             data: usuarioAtualizado
         })
 
     } catch (error) {
+
+        await trx.rollback();
+
         next(error);
+
     }
 
 }
