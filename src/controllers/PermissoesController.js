@@ -137,7 +137,7 @@ export const editarPermissoesDoUsuario = async (req, res, next) => {
                 .where('permissoes_usuarios.usuario_id', id)
                 .del()
 
-            const dadosAInserir = permissoesSelecionadas.map(p => ({
+            const dadosAInserir = permissoesNoBanco.map(p => ({
                 usuario_id: id,
                 permissao_id: p.id
             }));
