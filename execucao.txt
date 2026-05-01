@@ -9,6 +9,9 @@ npm install nodemon
 npm install cookies-parser'
 npm install chalk log-symbols
 npm install swagger-ui-express swagger-jsdoc
+npm install express-rate-limit
+
+(implementar token bucket com redis)
 
 
 criar migration: npx knex migrate:make 'nome_da_migratio'

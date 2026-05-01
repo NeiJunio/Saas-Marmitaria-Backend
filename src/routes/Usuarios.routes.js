@@ -11,6 +11,8 @@ import {
 
 import { editarPermissoesDoUsuario } from "../controllers/Permissoes.Controller.js";
 
+import { limitadorCadastro } from "../middlewares/rateLimiter.js";
+
 import { verifyToken } from "../middlewares/verifyToken.js";
 import { checkPermission } from "../middlewares/checkPermission.js";
 
@@ -63,7 +65,7 @@ const router = Router();
  *               status: "fail"
  *               message: "Este email já está em uso."
  */
-router.post('/', criarUsuario);
+router.post('/', limitadorCadastro, criarUsuario);
 
 router.use(verifyToken);
 

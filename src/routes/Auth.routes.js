@@ -1,6 +1,7 @@
 import { Router } from "express";
 
 import { login, logout } from "../controllers/Auth.Controller.js";
+import { limitadorLogin } from "../middlewares/rateLimiter.js";
 
 const router = Router();
 
@@ -63,7 +64,7 @@ const router = Router();
  *               status: "fail"
  *               message: "Sua conta está suspensa. Contate o Administrador"
  */
-router.post('/login', login);
+router.post('/login', limitadorLogin, login);
 
 /**
  * @swagger
