@@ -91,8 +91,16 @@ export const listarPermissoesDoUsuarioLogado = async (req, res, next) => {
 
 export const editarPermissoesDoUsuario = async (req, res, next) => {
 
-    const { id } = req.params;
+    if (!req.body || !('permissoes' in req.body)) {
+        return next(lancarErro('O campo "permissoes" é obrigatório, mesmo que vazio [].', 400));
+    }
+
+    const { usuario_id } = req.params;
     const { permissoes } = req.body;
+
+    if (!Array.isArray(permissoes)) {
+        return next(lancarErro('O campo "permissoes" deve ser um array.', 400));
+    }
 
     const trx = await connection.transaction();
 
@@ -101,7 +109,7 @@ export const editarPermissoesDoUsuario = async (req, res, next) => {
         // Verificando se o usuário existe
         const usuarioExiste = await connection('usuarios')
             .transacting(trx)
-            .where('usuarios.id', id)
+            .where('usuarios.id', usuario_id)
             .first()
 
         // Se o usuário não existir, lança uma exceção
@@ -110,8 +118,14 @@ export const editarPermissoesDoUsuario = async (req, res, next) => {
             lancarErro('Usuário não encontrado', 404);
         }
 
+        // Deletando todas as permissões do usuário selecionado
+        await connection('permissoes_usuarios')
+            .transacting(trx)
+            .where('permissoes_usuarios.usuario_id', usuario_id)
+            .del()
+
         // Inserir novas permissões
-        if (permissoes && permissoes.length > 0) {
+        if (permissoes.length > 0) {
 
             const permissoesNoBanco = await connection('permissoes')
                 .transacting(trx)
@@ -130,26 +144,20 @@ export const editarPermissoesDoUsuario = async (req, res, next) => {
                 return lancarErro(`As seguintes permissões são inválidas: ${invalidas.join(', ')}`, 400);
             }
 
-
-            // Deletando todas as permissões do usuário selecionado
-            await connection('permissoes_usuarios')
-                .transacting(trx)
-                .where('permissoes_usuarios.usuario_id', id)
-                .del()
-
             const dadosAInserir = permissoesNoBanco.map(p => ({
-                usuario_id: id,
+                usuario_id: usuario_id,
                 permissao_id: p.id
             }));
 
             await connection('permissoes_usuarios')
                 .transacting(trx)
                 .insert(dadosAInserir)
+
         } else {
             // Caso venha um array vazio, apenas limpamos as permissões (remove todos os acessos)
             await connection('permissoes_usuarios')
                 .transacting(trx)
-                .where('permissoes_usuarios.usuario_id', id)
+                .where('permissoes_usuarios.usuario_id', usuario_id)
                 .del();
         }
 
@@ -176,7 +184,11 @@ export const editarPermissoesDoUsuario = async (req, res, next) => {
 
 
     } catch (error) {
-        await trx.rollback();
+        if (trx) {
+
+            await trx.rollback();
+        }
+
         next(error);
     }
 

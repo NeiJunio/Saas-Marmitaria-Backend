@@ -186,6 +186,10 @@ export const editarUsuario = async (req, res, next) => {
     const trx = await connection.transaction();
 
     try {
+        
+        if (!req.body) {
+            lancarErro('O corpo da requisição não pode estar vazio.', 400)
+        }
 
         const { id } = req.params;
         const { nome, email, nivel_acesso_id, ativo } = req.body;
@@ -231,8 +235,8 @@ export const editarUsuario = async (req, res, next) => {
                 'nome': nome || usuarioExiste.nome,
                 'email': email || usuarioExiste.email,
                 'nivel_acesso_id': nivel_acesso_id || usuarioExiste.nivel_acesso_id,
-                'ativo': ativo !== undefined ? ativo : usuarioExiste.ativo,
-                'atualizado_em': new Date()
+                'ativo': ativo !== undefined ? ativo : usuarioExiste.ativo
+                // 'atualizado_em': new Date()
             })
             .returning(['id', 'nome', 'email', 'ativo'])
 
@@ -263,7 +267,10 @@ export const editarUsuario = async (req, res, next) => {
 
     } catch (error) {
 
-        await trx.rollback();
+        if (trx) {
+
+            await trx.rollback();
+        }
 
         next(error);
 
@@ -318,7 +325,10 @@ export const inativarUsuario = async (req, res, next) => {
         });
     } catch (error) {
 
-        await trx.rollback();
+        if (trx) {
+
+            await trx.rollback();
+        }
 
         next(error);
 
@@ -344,7 +354,7 @@ export const reativarUsuario = async (req, res, next) => {
         if (!usuarioExiste) {
 
             await trx.rollback()
-            
+
             lancarErro('Usuário não encontrado ou já se encontra ativo', 404);
 
         }
@@ -377,7 +387,10 @@ export const reativarUsuario = async (req, res, next) => {
 
     } catch (error) {
 
-        await trx.rollback();
+        if (trx) {
+
+            await trx.rollback();
+        }
 
         next(error);
     }

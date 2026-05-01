@@ -7,9 +7,9 @@ import {
     editarUsuario,
     inativarUsuario,
     reativarUsuario
-} from "../controllers/UsuariosController.js";
+} from "../controllers/Usuarios.Controller.js";
 
-import { editarPermissoesDoUsuario } from "../controllers/PermissoesController.js";
+import { editarPermissoesDoUsuario } from "../controllers/Permissoes.Controller.js";
 
 import { verifyToken } from "../middlewares/verifyToken.js";
 import { checkPermission } from "../middlewares/checkPermission.js";

@@ -3,8 +3,9 @@ import { Router } from "express";
 import {
     listarPermissoes,
     listarPermissoesPorUsuario,
-    listarPermissoesDoUsuarioLogado
- } from "../controllers/PermissoesController.js";
+    listarPermissoesDoUsuarioLogado,
+    editarPermissoesDoUsuario
+ } from "../controllers/Permissoes.Controller.js";
 
 import { verifyToken } from "../middlewares/verifyToken.js";
 import { checkPermission } from "../middlewares/checkPermission.js";
@@ -168,5 +169,108 @@ router.get('/me', listarPermissoesDoUsuarioLogado)
  *               message: "Usuário não encontrado"
  */
 router.get('/:usuario_id', checkPermission('permissoes.visualizar'), listarPermissoesPorUsuario);
+
+/**
+ * @swagger
+ * /permissoes/{usuario_id}/alterar:
+ *   patch:
+ *     summary: Altera as permissões de um usuário específico
+ *     description: |
+ *       Atualiza as permissões de um usuário existente. Esta rota substitui todas as permissões atuais do usuário pelas novas fornecidas.
+ *       - Se enviar um array vazio, todas as permissões serão removidas do usuário
+ *       - Se enviar permissões inválidas (que não existem no banco), retornará erro 400
+ *       - Requer autenticação e permissão 'permissoes.editar'
+ *       - Registra um log de auditoria com a alteração
+ *     tags: [Permissoes]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: usuario_id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID do usuário para editar permissões
+ *         example: 1
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - permissoes
+ *             properties:
+ *               permissoes:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: |
+ *                   Array com os nomes das permissões a serem atribuídas ao usuário.
+ *                   As permissões devem existir na tabela 'permissoes'.
+ *                   Envie array vazio para remover todas as permissões.
+ *                 example:
+ *                   - "usuarios.listar"
+ *                   - "usuarios.editar"
+ *                   - "permissoes.listar"
+ *           examples:
+ *             atualizar:
+ *               summary: Atualizar permissões
+ *               value:
+ *                 permissoes:
+ *                   - "usuarios.listar"
+ *                   - "usuarios.editar"
+ *                   - "permissoes.listar"
+ *             remover_todas:
+ *               summary: Remover todas as permissões
+ *               value:
+ *                 permissoes: []
+ *     responses:
+ *       200:
+ *         description: Permissões atualizadas com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Success'
+ *             example:
+ *               status: "success"
+ *               message: "Permissões atualizadas com sucesso!"
+ *       400:
+ *         description: Dados inválidos
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             examples:
+ *               campo_obrigatorio:
+ *                 summary: Campo obrigatório ausente
+ *                 value:
+ *                   status: "fail"
+ *                   message: "O campo \"permissoes\" é obrigatório, mesmo que vazio []."
+ *               tipo_invalido:
+ *                 summary: Tipo de dado inválido
+ *                 value:
+ *                   status: "fail"
+ *                   message: "O campo \"permissoes\" deve ser um array."
+ *               permissoes_invalidas:
+ *                 summary: Permissões inexistentes
+ *                 value:
+ *                   status: "fail"
+ *                   message: "As seguintes permissões são inválidas: usuarios.deletar, permissoes.invalida"
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       404:
+ *         description: Usuário não encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             example:
+ *               status: "fail"
+ *               message: "Usuário não encontrado"
+ */
+router.patch('/:usuario_id/alterar', checkPermission('permissoes.editar'), editarPermissoesDoUsuario)
 
 export default router;

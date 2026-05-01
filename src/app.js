@@ -1,9 +1,10 @@
 import express from 'express';
 import cookieParser from 'cookie-parser';
 
-import authRoutes from './routes/Auth.routes.js'
-import permissoesRoutes from './routes/Permissoes.routes.js'
-import usuariosRoutes from './routes/Usuarios.routes.js'
+import AuthRoutes from './routes/Auth.Routes.js'
+import PermissoesRoutes from './routes/Permissoes.Routes.js'
+import StatusLojaRouter from './routes/StatusLoja.Routes.js'
+import UsuariosRoutes from './routes/Usuarios.Routes.js'
 
 import errorHandler from './middlewares/errorHandler.js';
 
@@ -51,9 +52,10 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
     },
 }));
 
-app.use('/auth', authRoutes)
-app.use('/permissoes', permissoesRoutes)
-app.use('/usuarios', usuariosRoutes)
+app.use('/auth', AuthRoutes)
+app.use('/permissoes', PermissoesRoutes)
+app.use('/status-loja', StatusLojaRouter)
+app.use('/usuarios', UsuariosRoutes)
 
 app.use(errorHandler)
 
