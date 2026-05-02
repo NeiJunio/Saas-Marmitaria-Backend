@@ -1,7 +1,6 @@
 import connection from "../database/connection.js";
 import { hashPassword } from "../utils/passwordUtils.js";
 import { lancarErro } from "../utils/errorUtils.js";
-// import bcrypt from "bcryptjs";
 
 // Validador de email
 function isValidEmail(email) {
@@ -17,57 +16,84 @@ function isValidPassword(password) {
 
 // Criando usuário
 export const criarUsuario = async (req, res, next) => {
+    // 1. Validações de Formato (Fail Fast) - Fora da Transaction
+    const { nome, email, senha, nivel_acesso_id } = req.body;
+
+    if (!nome || !email || !senha || !nivel_acesso_id) {
+        return next(lancarErro('Preencha todos os campos corretamente.', 400));
+    }
+
+    if (!isValidEmail(email)) {
+        return next(lancarErro('E-mail inválido.', 400));
+    }
+
+    if (!isValidPassword(senha)) {
+        return next(lancarErro('A senha não atende aos requisitos de segurança.', 400));
+    }
+
+    // Iniciamos a transação
+    const trx = await connection.transaction();
+
     try {
-        const { nome, email, senha, nivel_acesso_id } = req.body;
-
-        // console.log(req.body);
-
-        if (!nome || !email || !senha) {
-            lancarErro('Preencha todos os campos corretamente.');
-        }
-
-        if (email && !isValidEmail(email)) {
-            lancarErro('E-mail inválido.');
-        }
-
-        if (senha && !isValidPassword(senha)) {
-            lancarErro('A senha deve ter no mínimo 12 caracteres, contendo maiúsculas, minúsculas, números e caracteres especiais')
-        }
-
-        if (!nivel_acesso_id) {
-            lancarErro("O campo nivel_acesso_id é obrigatório.");
-        }
-
+        // 2. Verificar se o e-mail já existe (ignora se está deletado ou não, 
+        // pois e-mail costuma ser chave única global no sistema)
         const usuarioExiste = await connection('usuarios')
-            .where({ email })
+            .transacting(trx)
+            .where({ email: email.toLowerCase() })
             .first();
 
         if (usuarioExiste) {
-            lancarErro('Este email já está em uso.')
+            await trx.rollback();
+            return next(lancarErro('Este e-mail já está em uso.', 400));
         }
 
-
+        // 3. Hash da senha
         const passwordHash = await hashPassword(senha);
 
+        // 4. Inserção do Usuário
         const [novoUsuario] = await connection('usuarios')
+            .transacting(trx)
             .insert({
-                nome: nome,
+                nome: nome.trim(),
                 email: email.toLowerCase(),
-                senha_hash: passwordHash, // Supondo que sua coluna no banco se chame 'senha'
-                nivel_acesso_id: nivel_acesso_id
+                senha_hash: passwordHash,
+                nivel_acesso_id: nivel_acesso_id,
+                ativo: true // Garantimos que ele nasce ativo
             })
-            .returning(['id', 'nome', 'email']);
+            .returning(['id', 'nome', 'email', 'nivel_acesso_id']);
+
+        // 5. Log de Auditoria
+        await connection('logs')
+            .transacting(trx)
+            .insert({
+                tipo: 'ACAO',
+                usuario_id: req.usuario?.id || novoUsuario.id, // Se for um auto-cadastro, usa o ID do novo
+                metodo: req.method,
+                endpoint: req.originalUrl,
+                acao: 'USUARIOS.CRIAR',
+                descricao: `Novo usuário cadastrado: ${novoUsuario.nome} (ID: ${novoUsuario.id})`,
+                payload: JSON.stringify({
+                    usuario_criado_id: novoUsuario.id,
+                    nivel_acesso: novoUsuario.nivel_acesso_id,
+                    contexto: {
+                        ip: req.ip,
+                        user_agent: req.headers['user-agent']
+                    }
+                })
+            });
+
+        await trx.commit();
 
         return res.status(201).json({
             status: 'success',
             data: novoUsuario
-        })
-
+        });
 
     } catch (error) {
-        next(error)
+        if (trx) await trx.rollback();
+        next(error);
     }
-}
+};
 
 // Listando todos os usuários
 export const listarUsuarios = async (req, res, next) => {
@@ -111,7 +137,7 @@ export const listarUsuarios = async (req, res, next) => {
             })
         }
 
-        const countQuery = query.clone().clearSelect().count('usuarios.id AS total').first();
+        const countQuery = await query.clone().clearSelect().count('usuarios.id AS total').first();
 
         const { total } = await countQuery;
 
@@ -332,7 +358,6 @@ export const inativarUsuario = async (req, res, next) => {
 
     }
 }
-
 
 // Reativação do usuário
 export const reativarUsuario = async (req, res, next) => {

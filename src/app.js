@@ -3,6 +3,7 @@ import cookieParser from 'cookie-parser';
 
 import { limitadorGeral } from './middlewares/rateLimiter.js';
 
+import AlimentosRoutes from './routes/Alimentos.Routes.js'
 import AuthRoutes from './routes/Auth.Routes.js'
 import CategoriasAlimentosRoutes from './routes/CategoriaAlimento.Routes.js'
 import PermissoesRoutes from './routes/Permissoes.Routes.js'
@@ -57,6 +58,7 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
 
 
 app.use(limitadorGeral);
+app.use('/alimentos', AlimentosRoutes)
 app.use('/auth', AuthRoutes)
 app.use('/categorias-alimentos', CategoriasAlimentosRoutes)
 app.use('/permissoes', PermissoesRoutes)

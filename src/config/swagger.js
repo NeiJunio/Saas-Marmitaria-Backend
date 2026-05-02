@@ -159,6 +159,25 @@ const options = {
                         deletado_em: { type: 'string', format: 'date-time', nullable: true, description: 'Data de exclusão (soft delete)', example: null },
                     },
                 },
+                AlimentoCreate: {
+                    type: 'object',
+                    required: ['nome', 'categoria_id'],
+                    properties: {
+                        nome: { type: 'string', maxLength: 100, description: 'Nome do alimento', example: 'Frango Grelhado' },
+                        categoria_id: { type: 'integer', description: 'ID da categoria do alimento', example: 1 },
+                        descricao: { type: 'string', nullable: true, description: 'Descrição do alimento', example: 'Filé de frango grelhado com temperos' },
+                        disponivel_hoje: { type: 'boolean', description: 'Disponibilidade do alimento para o dia', example: true },
+                    },
+                },
+                AlimentoUpdate: {
+                    type: 'object',
+                    properties: {
+                        nome: { type: 'string', maxLength: 100, description: 'Nome do alimento', example: 'Frango Grelhado' },
+                        categoria_id: { type: 'integer', description: 'ID da categoria do alimento', example: 1 },
+                        descricao: { type: 'string', nullable: true, description: 'Descrição do alimento', example: 'Filé de frango grelhado com temperos' },
+                        disponivel_hoje: { type: 'boolean', description: 'Disponibilidade do alimento para o dia', example: true },
+                    },
+                },
                 Pedido: {
                     type: 'object',
                     properties: {
