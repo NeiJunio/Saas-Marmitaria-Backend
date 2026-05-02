@@ -4,6 +4,7 @@ import cookieParser from 'cookie-parser';
 import { limitadorGeral } from './middlewares/rateLimiter.js';
 
 import AuthRoutes from './routes/Auth.Routes.js'
+import CategoriasAlimentosRoutes from './routes/CategoriaAlimento.Routes.js'
 import PermissoesRoutes from './routes/Permissoes.Routes.js'
 import StatusLojaRouter from './routes/StatusLoja.Routes.js'
 import UsuariosRoutes from './routes/Usuarios.Routes.js'
@@ -19,25 +20,25 @@ import cors from 'cors';
 const app = express();
 
 const allowedOrigins = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(',')
-  : [];
+    ? process.env.ALLOWED_ORIGINS.split(',')
+    : [];
 
 // 2. Atualização Importante no CORS
 app.use(cors({
-  origin: function (origin, callback) {
-    // Permite requests sem origin (Postman, Render healthcheck etc)
-    if (!origin) return callback(null, true);
+    origin: function (origin, callback) {
+        // Permite requests sem origin (Postman, Render healthcheck etc)
+        if (!origin) return callback(null, true);
 
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error("Not allowed by CORS"));
-    }
-  },
-  credentials: true,
-  // ADICIONE ISSO: Permite que o Front envie o Token no header
-  allowedHeaders: ['Content-Type', 'Authorization'], 
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
+        if (allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error("Not allowed by CORS"));
+        }
+    },
+    credentials: true,
+    // ADICIONE ISSO: Permite que o Front envie o Token no header
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
 }));
 
 app.use(express.json());
@@ -57,6 +58,7 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
 
 app.use(limitadorGeral);
 app.use('/auth', AuthRoutes)
+app.use('/categorias-alimentos', CategoriasAlimentosRoutes)
 app.use('/permissoes', PermissoesRoutes)
 app.use('/status-loja', StatusLojaRouter)
 app.use('/usuarios', UsuariosRoutes)

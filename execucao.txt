@@ -21,6 +21,10 @@ criar seed: npx knex seed:make 'nome_do_seed'
 rodar seed: npx knex seed:run
 npx knex seed:run --specific='vincular_permissoes_ao_admin.js'
 
+npx knex migrate:rollback --all
+npx knex migrate:latest
+npx knex seed:run
+
 
 rate-limit 
 helmet

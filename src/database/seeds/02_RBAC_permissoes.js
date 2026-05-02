@@ -36,9 +36,29 @@ export async function seed(knex) {
         { nome: 'relatorios.financeiro', descricao: 'Visualizar faturamento e lucros' },
         { nome: 'relatorios.vendas', descricao: 'Visualizar estatísticas de vendas' },
 
-        {nome: 'permissoes.listar', descricao: 'Visualizar lista de todas as permissões do sistema'},
-        {nome: 'permissoes.visualizar', descricao: 'Visualizar quais permissões um usuário possui'},
-        {nome: 'permissoes.editar', descricao: 'Alterar as permissões de um usuário'}
+        { nome: 'permissoes.listar', descricao: 'Visualizar lista de todas as permissões do sistema' },
+        { nome: 'permissoes.visualizar', descricao: 'Visualizar quais permissões um usuário possui' },
+        { nome: 'permissoes.editar', descricao: 'Alterar as permissões de um usuário' },
+        
+        // --- CATEGORIAS DE ALIMENTOS ---
+        { nome: 'categorias_alimentos.listar', descricao: 'Visualizar categorias de alimentos' },
+        { nome: 'categorias_alimentos.criar', descricao: 'Cadastrar novas categorias de alimentos' },
+        { nome: 'categorias_alimentos.editar', descricao: 'Editar categorias de alimentos existentes' },
+        { nome: 'categorias_alimentos.deletar', descricao: 'Remover categorias de alimentos do sistema' },
+
+        // --- ALIMENTOS ---
+        { nome: 'alimentos.listar', descricao: 'Visualizar lista de alimentos' },
+        { nome: 'alimentos.criar', descricao: 'Cadastrar novos alimentos' },
+        { nome: 'alimentos.editar', descricao: 'Editar dados dos alimentos' },
+        { nome: 'alimentos.deletar', descricao: 'Remover alimentos do sistema' },
+        { nome: 'alimentos.estoque', descricao: 'Alterar disponibilidade de itens' },
+
+        // --- TAMANHOS DE MARMITAS ---
+        { nome: 'tamanhos_marmitas.listar', descricao: 'Visualizar tamanhos de marmitas' },
+        { nome: 'tamanhos_marmitas.criar', descricao: 'Cadastrar novos tamanhos e preços' },
+        { nome: 'tamanhos_marmitas.editar', descricao: 'Editar preços e regras de tamanhos' },
+        { nome: 'tamanhos_marmitas.deletar', descricao: 'Remover tamanhos de marmitas do sistema' },
+
     ];
 
     // 3. Insere apenas as permissões no banco

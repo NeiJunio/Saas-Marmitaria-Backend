@@ -186,13 +186,13 @@ export const editarUsuario = async (req, res, next) => {
     const trx = await connection.transaction();
 
     try {
-        
-        if (!req.body) {
-            lancarErro('O corpo da requisição não pode estar vazio.', 400)
+
+        if (!req.body || Object.keys(req.body).length === 0) {
+            return next(lancarErro('O corpo da requisição não pode estar vazio.', 400));
         }
 
         const { id } = req.params;
-        const { nome, email, nivel_acesso_id, ativo } = req.body;
+        const { nome, email, nivel_acesso_id } = req.body;
 
         const usuarioExiste = await connection('usuarios')
             .transacting(trx)
@@ -234,11 +234,10 @@ export const editarUsuario = async (req, res, next) => {
             .update({
                 'nome': nome || usuarioExiste.nome,
                 'email': email || usuarioExiste.email,
-                'nivel_acesso_id': nivel_acesso_id || usuarioExiste.nivel_acesso_id,
-                'ativo': ativo !== undefined ? ativo : usuarioExiste.ativo
+                'nivel_acesso_id': nivel_acesso_id || usuarioExiste.nivel_acesso_id
                 // 'atualizado_em': new Date()
             })
-            .returning(['id', 'nome', 'email', 'ativo'])
+            .returning(['id', 'nome', 'email'])
 
         // Log de auditoria
         await connection('logs')
@@ -255,7 +254,6 @@ export const editarUsuario = async (req, res, next) => {
                     usuario_agetado_id: id
                 })
             })
-
 
         await trx.commit();
 

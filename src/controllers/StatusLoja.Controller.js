@@ -25,8 +25,8 @@ export const buscarStatusLoja = async (req, res, next) => {
 
 export const alterarStatusLoja = async (req, res, next) => {
 
-    if (!req.body) {
-        lancarErro('O corpo da requisição não pode estar vazio.', 400)
+    if (!req.body || Object.keys(req.body).length === 0) {
+        return next(lancarErro('O corpo da requisição não pode estar vazio.', 400));
     }
 
     const { esta_aberta } = req.body;
@@ -35,9 +35,9 @@ export const alterarStatusLoja = async (req, res, next) => {
 
     try {
 
-        if (typeof esta_aberta !== 'boolean') {
+        if (esta_aberta !== undefined && typeof esta_aberta !== 'boolean') {
             (await trx).rollback();
-            lancarErro('O valor do parâmetro esta_aberta deve ser true ou false', 400)
+            return next(lancarErro('O valor do parâmetro esta_aberta deve ser true ou false', 400))
         }
 
         const atualizado = await connection('status_loja')
@@ -50,7 +50,7 @@ export const alterarStatusLoja = async (req, res, next) => {
         if (atualizado === 0) {
             await rollback();
 
-            lancarErro('Não foi possível atualizar: Registro inicial não encontrado.')
+            return next(lancarErro('Não foi possível atualizar: Registro inicial não encontrado.'))
         }
 
         // Log de auditoria
