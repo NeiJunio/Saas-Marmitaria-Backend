@@ -99,3 +99,20 @@ usuarios
     "senha": "Senhaforte789@",
     "nivel_acesso_id": 2
 }
+
+
+
+{
+    "nome_cliente": "João Silva",
+    "telefone_cliente": "11999999999",
+    "endereco_cliente": "Rua das Marmitas, 123",
+    "tipo_pedido": "Remoto",
+    "metodo_pagamento_id": 1,
+    "marmitas": [
+        {
+            "tamanho_id": 1,
+            "quantidade": 2,
+            "alimentos": [7, 8, 9] 
+        }
+    ]
+}

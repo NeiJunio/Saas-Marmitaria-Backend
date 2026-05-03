@@ -6,8 +6,10 @@ import { limitadorGeral } from './middlewares/rateLimiter.js';
 import AlimentosRoutes from './routes/Alimentos.Routes.js'
 import AuthRoutes from './routes/Auth.Routes.js'
 import CategoriasAlimentosRoutes from './routes/CategoriaAlimento.Routes.js'
+import PedidosRoutes from './routes/Pedidos.Routes.js'
 import PermissoesRoutes from './routes/Permissoes.Routes.js'
-import StatusLojaRouter from './routes/StatusLoja.Routes.js'
+import StatusLojaRoutes from './routes/StatusLoja.Routes.js'
+import TamanhosMarmitasRoutes from './routes/TamanhosMarmitas.Routes.js'
 import UsuariosRoutes from './routes/Usuarios.Routes.js'
 
 import errorHandler from './middlewares/errorHandler.js';
@@ -61,8 +63,10 @@ app.use(limitadorGeral);
 app.use('/alimentos', AlimentosRoutes)
 app.use('/auth', AuthRoutes)
 app.use('/categorias-alimentos', CategoriasAlimentosRoutes)
+app.use('/pedidos', PedidosRoutes)
 app.use('/permissoes', PermissoesRoutes)
-app.use('/status-loja', StatusLojaRouter)
+app.use('/status-loja', StatusLojaRoutes)
+app.use('/tamanhos-marmitas', TamanhosMarmitasRoutes),
 app.use('/usuarios', UsuariosRoutes)
 
 app.use(errorHandler)

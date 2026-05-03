@@ -135,12 +135,52 @@ const options = {
                         nome: { type: 'string', maxLength: 50, description: 'Nome do tamanho (P, M, G, etc)', example: 'Grande' },
                         preco_base: { type: 'number', format: 'decimal', description: 'Preço base do tamanho', example: 25.00 },
                         ativo: { type: 'boolean', description: 'Status de atividade', example: true },
+                        criado_em: { type: 'string', format: 'date-time', description: 'Data de criação', example: '2026-05-01T14:25:31.000Z' },
+                        atualizado_em: { type: 'string', format: 'date-time', description: 'Data da última atualização', example: '2026-05-01T14:25:31.000Z' },
+                        deletado_em: { type: 'string', format: 'date-time', nullable: true, description: 'Data de exclusão (soft delete)', example: null },
+                    },
+                },
+                TamanhoMarmitaCreate: {
+                    type: 'object',
+                    required: ['nome', 'preco_base'],
+                    properties: {
+                        nome: { type: 'string', maxLength: 50, description: 'Nome do tamanho (P, M, G, etc)', example: 'Grande' },
+                        preco_base: { type: 'number', format: 'decimal', description: 'Preço base do tamanho', example: 25.00 },
+                        ativo: { type: 'boolean', description: 'Status de atividade', example: true },
+                    },
+                },
+                TamanhoMarmitaUpdate: {
+                    type: 'object',
+                    properties: {
+                        nome: { type: 'string', maxLength: 50, description: 'Nome do tamanho (P, M, G, etc)', example: 'Grande' },
+                        preco_base: { type: 'number', format: 'decimal', description: 'Preço base do tamanho', example: 25.00 },
+                        ativo: { type: 'boolean', description: 'Status de atividade', example: true },
                     },
                 },
                 CategoriaAlimento: {
                     type: 'object',
                     properties: {
                         id: { type: 'integer', description: 'ID único da categoria', example: 1 },
+                        nome: { type: 'string', maxLength: 50, description: 'Nome da categoria', example: 'Proteína' },
+                        limite_escolhas: { type: 'integer', description: 'Limite de escolhas por categoria no pedido', example: 2 },
+                        ativo: { type: 'boolean', description: 'Status de atividade', example: true },
+                        criado_em: { type: 'string', format: 'date-time', description: 'Data de criação', example: '2026-05-01T14:25:31.000Z' },
+                        atualizado_em: { type: 'string', format: 'date-time', description: 'Data da última atualização', example: '2026-05-01T14:25:31.000Z' },
+                        deletado_em: { type: 'string', format: 'date-time', nullable: true, description: 'Data de exclusão (soft delete)', example: null },
+                    },
+                },
+                CategoriaAlimentoCreate: {
+                    type: 'object',
+                    required: ['nome', 'limite_escolhas'],
+                    properties: {
+                        nome: { type: 'string', maxLength: 50, description: 'Nome da categoria', example: 'Proteína' },
+                        limite_escolhas: { type: 'integer', description: 'Limite de escolhas por categoria no pedido', example: 2 },
+                        ativo: { type: 'boolean', description: 'Status de atividade', example: true },
+                    },
+                },
+                CategoriaAlimentoUpdate: {
+                    type: 'object',
+                    properties: {
                         nome: { type: 'string', maxLength: 50, description: 'Nome da categoria', example: 'Proteína' },
                         limite_escolhas: { type: 'integer', description: 'Limite de escolhas por categoria no pedido', example: 2 },
                         ativo: { type: 'boolean', description: 'Status de atividade', example: true },
@@ -192,6 +232,19 @@ const options = {
                         observacoes: { type: 'string', nullable: true, description: 'Observações do pedido', example: 'Sem cebola' },
                         criado_em: { type: 'string', format: 'date-time', description: 'Data de criação', example: '2026-04-26T10:00:00.000Z' },
                         atualizado_em: { type: 'string', format: 'date-time', description: 'Data da última atualização', example: '2026-04-26T10:00:00.000Z' },
+                    },
+                },
+                PedidoCreate: {
+                    type: 'object',
+                    required: ['nome_cliente', 'telefone_cliente', 'endereco_cliente', 'tipo_pedido', 'metodo_pagamento_id', 'valor_total'],
+                    properties: {
+                        nome_cliente: { type: 'string', maxLength: 100, description: 'Nome do cliente', example: 'Maria Santos' },
+                        telefone_cliente: { type: 'string', maxLength: 20, description: 'Telefone de contato', example: '(11) 99999-9999' },
+                        endereco_cliente: { type: 'string', maxLength: 255, description: 'Endereço de entrega', example: 'Rua Example, 123' },
+                        tipo_pedido: { type: 'string', enum: ['Presencial', 'Remoto'], description: 'Tipo de pedido: Presencial (retirada) ou Remoto (entrega)', example: 'Remoto' },
+                        metodo_pagamento_id: { type: 'integer', description: 'ID do método de pagamento', example: 1 },
+                        valor_total: { type: 'number', format: 'decimal', description: 'Valor total do pedido', example: 50.00 },
+                        observacoes: { type: 'string', nullable: true, description: 'Observações do pedido', example: 'Sem cebola' },
                     },
                 },
                 ItemPedido: {
