@@ -108,7 +108,7 @@ export async function up(knex) {
                 .inTable('metodos_pagamento')
                 .onDelete('RESTRICT')
                 .onUpdate('CASCADE');
-            table.enu('status', ['Pendente', 'Em Preparo', 'Pronto para Retirada', 'Entregue', 'Cancelado'], { useNative: true, enumName: 'status_pedido' }).defaultTo('Pendente');
+            table.enu('status', ['Pendente', 'Em Preparo', 'Pronto para Retirada', 'Saiu para Entrega', 'Entregue', 'Cancelado'], { useNative: true, enumName: 'status_pedido' }).defaultTo('Pendente');
             table.decimal('valor_total', 10, 2).notNullable();
             table.text('observacoes').nullable();
             table.timestamp('criado_em').defaultTo(knex.fn.now());

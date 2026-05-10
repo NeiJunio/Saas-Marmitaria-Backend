@@ -287,7 +287,7 @@ export const deletarAlimento = async (req, res, next) => {
             .transacting(trx)
             .where('id', id)
             .update({
-                deletado_em: new Date()
+                deletado_em: connection.fn.now()
             });
 
         // Logs de auditoria

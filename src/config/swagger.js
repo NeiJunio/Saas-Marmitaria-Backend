@@ -227,24 +227,67 @@ const options = {
                         endereco_cliente: { type: 'string', maxLength: 255, description: 'Endereço de entrega', example: 'Rua Example, 123' },
                         tipo_pedido: { type: 'string', enum: ['Presencial', 'Remoto'], description: 'Tipo de pedido: Presencial (retirada) ou Remoto (entrega)', example: 'Remoto' },
                         metodo_pagamento_id: { type: 'integer', description: 'ID do método de pagamento', example: 1 },
-                        status: { type: 'string', enum: ['Pendente', 'Em Preparo', 'Pronto para Retirada', 'Entregue', 'Cancelado'], description: 'Status do pedido', example: 'Pendente' },
+                        status: { type: 'string', enum: ['Pendente', 'Em Preparo', 'Pronto para Retirada', 'Saiu para Entrega', 'Entregue', 'Cancelado'], description: 'Status do pedido', example: 'Pendente' },
                         valor_total: { type: 'number', format: 'decimal', description: 'Valor total do pedido', example: 50.00 },
                         observacoes: { type: 'string', nullable: true, description: 'Observações do pedido', example: 'Sem cebola' },
                         criado_em: { type: 'string', format: 'date-time', description: 'Data de criação', example: '2026-04-26T10:00:00.000Z' },
                         atualizado_em: { type: 'string', format: 'date-time', description: 'Data da última atualização', example: '2026-04-26T10:00:00.000Z' },
+                        deletado_em: { type: 'string', format: 'date-time', nullable: true, description: 'Data de exclusão (soft delete)', example: null },
                     },
                 },
                 PedidoCreate: {
                     type: 'object',
-                    required: ['nome_cliente', 'telefone_cliente', 'endereco_cliente', 'tipo_pedido', 'metodo_pagamento_id', 'valor_total'],
+                    required: ['nome_cliente', 'telefone_cliente', 'endereco_cliente', 'tipo_pedido', 'metodo_pagamento_id', 'marmitas'],
                     properties: {
                         nome_cliente: { type: 'string', maxLength: 100, description: 'Nome do cliente', example: 'Maria Santos' },
                         telefone_cliente: { type: 'string', maxLength: 20, description: 'Telefone de contato', example: '(11) 99999-9999' },
                         endereco_cliente: { type: 'string', maxLength: 255, description: 'Endereço de entrega', example: 'Rua Example, 123' },
                         tipo_pedido: { type: 'string', enum: ['Presencial', 'Remoto'], description: 'Tipo de pedido: Presencial (retirada) ou Remoto (entrega)', example: 'Remoto' },
                         metodo_pagamento_id: { type: 'integer', description: 'ID do método de pagamento', example: 1 },
-                        valor_total: { type: 'number', format: 'decimal', description: 'Valor total do pedido', example: 50.00 },
                         observacoes: { type: 'string', nullable: true, description: 'Observações do pedido', example: 'Sem cebola' },
+                        marmitas: {
+                            type: 'array',
+                            description: 'Lista de marmitas do pedido',
+                            items: {
+                                type: 'object',
+                                properties: {
+                                    tamanho_marmita_id: { type: 'integer', description: 'ID do tamanho da marmita', example: 1 },
+                                    quantidade: { type: 'integer', description: 'Quantidade', example: 2 },
+                                    alimentos: {
+                                        type: 'array',
+                                        description: 'Lista de IDs dos alimentos selecionados',
+                                        items: { type: 'integer', example: 1 }
+                                    }
+                                },
+                                required: ['tamanho_marmita_id', 'quantidade', 'alimentos']
+                            }
+                        }
+                    },
+                },
+                PedidoUpdate: {
+                    type: 'object',
+                    properties: {
+                        nome_cliente: { type: 'string', maxLength: 100, description: 'Nome do cliente', example: 'Maria Santos Atualizada' },
+                        endereco_cliente: { type: 'string', maxLength: 255, description: 'Endereço de entrega', example: 'Rua Nova, 456' },
+                        telefone_cliente: { type: 'string', maxLength: 20, description: 'Telefone de contato', example: '(11) 99999-9999' },
+                        metodo_pagamento_id: { type: 'integer', description: 'ID do método de pagamento', example: 2 },
+                        observacoes: { type: 'string', nullable: true, description: 'Observações do pedido', example: 'Sem cebola, adicionar molho' },
+                        marmitas: {
+                            type: 'array',
+                            description: 'Lista de marmitas do pedido (opcional para update)',
+                            items: {
+                                type: 'object',
+                                properties: {
+                                    tamanho_marmita_id: { type: 'integer', description: 'ID do tamanho da marmita', example: 1 },
+                                    quantidade: { type: 'integer', description: 'Quantidade', example: 2 },
+                                    alimentos: {
+                                        type: 'array',
+                                        description: 'Lista de IDs dos alimentos selecionados',
+                                        items: { type: 'integer', example: 1 }
+                                    }
+                                }
+                            }
+                        }
                     },
                 },
                 ItemPedido: {
@@ -374,7 +417,8 @@ const options = {
             { name: 'NiveisAcesso', description: 'Níveis de acesso (cargos)' },
             { name: 'Permissoes', description: 'Sistema de permissões RBAC' },
             { name: 'Logs', description: 'Logs de auditoria' },
-            { name: 'Negocios', description: 'Recursos de negócio (pedidos, alimentos, etc)' },
+            { name: 'Pedidos', description: 'Gerenciamento de pedidos' },
+            { name: 'Negocios', description: 'Recursos de negócio (alimentos, tamanhos, categorias, etc)' },
         ],
     },
     apis: ['./src/routes/*.js', './src/controllers/*.js'],

@@ -256,7 +256,7 @@ export const deletarCategoriaDeAlimento = async (req, res, next) => {
             .transacting(trx)
             .where({ id })
             .update({
-                deletado_em: new Date(),
+                deletado_em: connection.fn.now(),
                 ativo: false // Opcional: desativamos também para garantir que suma de listas simples
             });
 

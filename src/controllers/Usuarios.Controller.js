@@ -326,7 +326,7 @@ export const inativarUsuario = async (req, res, next) => {
             .where('usuarios.id', id)
             .update({
                 ativo: false,
-                deletado_em: new Date()
+                deletado_em: connection.fn.now()
             })
             .returning(['nome'])
 

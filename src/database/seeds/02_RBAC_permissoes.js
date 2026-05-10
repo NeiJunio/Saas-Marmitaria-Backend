@@ -27,6 +27,7 @@ export async function seed(knex) {
         { nome: 'pedidos.listar', descricao: 'Visualizar painel de pedidos' },
         { nome: 'pedidos.status', descricao: 'Alterar status do pedido (Preparando, Saiu p/ Entrega, etc)' },
         { nome: 'pedidos.cancelar', descricao: 'Cancelar pedidos ativos' },
+        { nome: 'pedidos.editar', descricao: 'Editar pedido' },
 
         // Módulo: Configurações da Loja
         { nome: 'loja.status', descricao: 'Abrir e fechar a loja para receber pedidos' },
@@ -39,7 +40,7 @@ export async function seed(knex) {
         { nome: 'permissoes.listar', descricao: 'Visualizar lista de todas as permissões do sistema' },
         { nome: 'permissoes.visualizar', descricao: 'Visualizar quais permissões um usuário possui' },
         { nome: 'permissoes.editar', descricao: 'Alterar as permissões de um usuário' },
-        
+
         // --- CATEGORIAS DE ALIMENTOS ---
         { nome: 'categorias_alimentos.listar', descricao: 'Visualizar categorias de alimentos' },
         { nome: 'categorias_alimentos.criar', descricao: 'Cadastrar novas categorias de alimentos' },
