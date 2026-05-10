@@ -6,6 +6,7 @@ import { limitadorGeral } from './middlewares/rateLimiter.js';
 import AlimentosRoutes from './routes/Alimentos.Routes.js'
 import AuthRoutes from './routes/Auth.Routes.js'
 import CategoriasAlimentosRoutes from './routes/CategoriaAlimento.Routes.js'
+import MetodosPagamentosRoutes from './routes/MetodosPagamentos.Routes.js'
 import PedidosRoutes from './routes/Pedidos.Routes.js'
 import PermissoesRoutes from './routes/Permissoes.Routes.js'
 import StatusLojaRoutes from './routes/StatusLoja.Routes.js'
@@ -63,6 +64,7 @@ app.use(limitadorGeral);
 app.use('/alimentos', AlimentosRoutes)
 app.use('/auth', AuthRoutes)
 app.use('/categorias-alimentos', CategoriasAlimentosRoutes)
+app.use('/metodos-pagamento', MetodosPagamentosRoutes)
 app.use('/pedidos', PedidosRoutes)
 app.use('/permissoes', PermissoesRoutes)
 app.use('/status-loja', StatusLojaRoutes)

@@ -126,6 +126,24 @@ const options = {
                         id: { type: 'integer', description: 'ID único do método', example: 1 },
                         nome: { type: 'string', maxLength: 50, description: 'Nome do método de pagamento', example: 'Dinheiro' },
                         ativo: { type: 'boolean', description: 'Status de atividade', example: true },
+                        criado_em: { type: 'string', format: 'date-time', description: 'Data de criação', example: '2026-05-10T13:46:05.000Z' },
+                        atualizado_em: { type: 'string', format: 'date-time', description: 'Data da última atualização', example: '2026-05-10T13:46:05.000Z' },
+                        deletado_em: { type: 'string', format: 'date-time', nullable: true, description: 'Data de exclusão (soft delete)', example: null },
+                    },
+                },
+                MetodoPagamentoCreate: {
+                    type: 'object',
+                    required: ['nome'],
+                    properties: {
+                        nome: { type: 'string', maxLength: 50, description: 'Nome do método de pagamento', example: 'Cartão de Crédito' },
+                        ativo: { type: 'boolean', description: 'Status de atividade', example: true },
+                    },
+                },
+                MetodoPagamentoUpdate: {
+                    type: 'object',
+                    properties: {
+                        nome: { type: 'string', maxLength: 50, description: 'Nome do método de pagamento', example: 'Cartão de Débito' },
+                        ativo: { type: 'boolean', description: 'Status de atividade', example: false },
                     },
                 },
                 TamanhoMarmita: {
@@ -418,6 +436,7 @@ const options = {
             { name: 'Permissoes', description: 'Sistema de permissões RBAC' },
             { name: 'Logs', description: 'Logs de auditoria' },
             { name: 'Pedidos', description: 'Gerenciamento de pedidos' },
+            { name: 'MetodosPagamento', description: 'Gerenciamento de métodos de pagamento' },
             { name: 'Negocios', description: 'Recursos de negócio (alimentos, tamanhos, categorias, etc)' },
         ],
     },

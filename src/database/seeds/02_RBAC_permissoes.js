@@ -60,6 +60,13 @@ export async function seed(knex) {
         { nome: 'tamanhos_marmitas.editar', descricao: 'Editar preços e regras de tamanhos' },
         { nome: 'tamanhos_marmitas.deletar', descricao: 'Remover tamanhos de marmitas do sistema' },
 
+        // --- MÉTODOS DE PAGAMENTOS --- 
+        { nome: 'metodos_pagamento.listar', descricao: 'Visualizar métodos de pagamento' },
+        { nome: 'metodos_pagamento.criar', descricao: 'Cadastrar novos métodos de pagamento' },
+        { nome: 'metodos_pagamento.editar', descricao: 'Editar métodos de pagamento existentes' },
+        { nome: 'metodos_pagamento.deletar', descricao: 'Remover métodos de pagamento do sistema' },
+        { nome: 'metodos_pagamento.restaurar', descricao: 'Restaurar métodos de pagamento excluídos' }
+
     ];
 
     // 3. Insere apenas as permissões no banco
