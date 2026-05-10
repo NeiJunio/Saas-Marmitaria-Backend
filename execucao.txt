@@ -14,6 +14,8 @@ npm install express-rate-limit
 (implementar token bucket com redis)
 
 
+node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+
 criar migration: npx knex migrate:make 'nome_da_migratio'
 rodar migration: npx knex migrate:latest
 
@@ -116,3 +118,15 @@ usuarios
         }
     ]
 }
+
+
+
+NODE_ENV=
+PORT=
+ALLOWED_ORIGINS=
+JWT_SECRET=
+DB_HOST=
+DB_PORT=
+DB_USER=
+DB_PASSWORD=
+DB_NAME=

@@ -20,6 +20,8 @@ import { swaggerSpec } from './config/swagger.js';
 
 import cors from 'cors';
 
+import dotenv from 'dotenv';
+dotenv.config();
 
 const app = express();
 
@@ -64,7 +66,7 @@ app.use(limitadorGeral);
 app.use('/alimentos', AlimentosRoutes)
 app.use('/auth', AuthRoutes)
 app.use('/categorias-alimentos', CategoriasAlimentosRoutes)
-app.use('/metodos-pagamento', MetodosPagamentosRoutes)
+app.use('/metodos-pagamentos', MetodosPagamentosRoutes)
 app.use('/pedidos', PedidosRoutes)
 app.use('/permissoes', PermissoesRoutes)
 app.use('/status-loja', StatusLojaRoutes)
