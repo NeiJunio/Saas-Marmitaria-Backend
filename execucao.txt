@@ -130,3 +130,5 @@ DB_PORT=
 DB_USER=
 DB_PASSWORD=
 DB_NAME=
+
+rodar seeds direto na nuvem: $env:NODE_ENV="production"; npx knex seed:run 9tem que colocar a database_url no .env

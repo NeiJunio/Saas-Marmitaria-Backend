@@ -32,6 +32,8 @@ export const listarAlimentos = async (req, res, next) => {
             query.where('alimentos.ativo', true)
         }
 
+        // console.log("SQL GERADO: ", query.toString());
+
         const total = await query.clone().count('alimentos.id AS total').first();
 
         const alimentos = await query

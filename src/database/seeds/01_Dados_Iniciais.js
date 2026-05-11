@@ -30,8 +30,6 @@ export async function seed(knex) {
             { nome: 'ACOMPANHAMENTOS', limite_escolhas: 3 },
             { nome: 'EXTRAS', limite_escolhas: 1 }
         ])
-        .onConflict('nome')
-        .merge();
 
     // 📦 TAMANHOS DE MARMITAS
     await knex('tamanhos_marmitas')
@@ -40,8 +38,6 @@ export async function seed(knex) {
             { nome: 'Média (M)', preco_base: 20.00 },
             { nome: 'Grande (G)', preco_base: 25.00 }
         ])
-        .onConflict('nome')
-        .merge();
 
     // 💳 MÉTODOS DE PAGAMENTO
     await knex('metodos_pagamento')
@@ -51,6 +47,4 @@ export async function seed(knex) {
             { nome: 'Cartão de Crédito' },
             { nome: 'Cartão de Débito' }
         ])
-        .onConflict('nome')
-        .merge();
 }

@@ -11,8 +11,6 @@ import { checkPermission } from "../middlewares/checkPermission.js";
 
 const router = Router();
 
-router.use(verifyToken);
-
 /**
  * @swagger
  * /alimentos:
@@ -69,7 +67,11 @@ router.use(verifyToken);
  *       403:
  *         $ref: '#/components/responses/Forbidden'
  */
-router.get('/', checkPermission('alimentos.listar'), listarAlimentos)
+router.get('/', listarAlimentos)
+
+
+router.use(verifyToken);
+
 
 /**
  * @swagger
