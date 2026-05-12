@@ -1,16 +1,31 @@
 import rateLimit from "express-rate-limit";
 
 // Limitador Geral para proteger a API por completa
+
+const isDev = process.env.NODE_ENV === 'development';
+
 export const limitadorGeral = rateLimit({
-    windowMs: 15 * 60 * 1000, // Janela de 15 minutos
+
+    windowMs: 15 * 60 * 1000,
     max: 200,
-    message: {
-        status: 'fail',
-        message: 'Muitas requisições vindas deste IP. Tente novamente em 15 minutos.'
-    },
-    standardHeaders: true, // Informa no cabeçalho quanto tempo falta para resetar
-    legacyHeaders: false
+
+    skip: (req) => {
+
+        if (isDev) return true;
+
+        return false;
+    }
 });
+// export const limitadorGeral = rateLimit({
+//     windowMs: 15 * 60 * 1000, // Janela de 15 minutos
+//     max: 200,
+//     message: {
+//         status: 'fail',
+//         message: 'Muitas requisições vindas deste IP. Tente novamente em 15 minutos.'
+//     },
+//     standardHeaders: true, // Informa no cabeçalho quanto tempo falta para resetar
+//     legacyHeaders: false
+// });
 
 
 // Limitador de Login para proteger contra força bruta
