@@ -2,7 +2,7 @@ import connection from "../database/connection.js";
 import { lancarErro } from "../utils/errorUtils.js";
 
 export const criarPedido = async (req, res, next) => {
-    const {
+    let {
         nome_cliente,
         telefone_cliente,
         endereco_cliente,
@@ -15,6 +15,17 @@ export const criarPedido = async (req, res, next) => {
     if (!marmitas || !Array.isArray(marmitas) || marmitas.length === 0) {
         return next(lancarErro('O pedido deve conter pelo menos uma marmita', 400));
     }
+
+    let telefoneLimpo = (telefone_cliente || '').replace(/\D/g, '');
+
+    if (telefoneLimpo.length < 10 || telefoneLimpo.length > 11) {
+        // Retorna o Erro 400 (Bad Request) que o seu frontend já sabe ler!
+        return res.status(400).json({
+            erro: "Telefone inválido. O telefone deve ter 10 ou 11 dígitos numéricos."
+        });
+    }
+
+    telefone_cliente = telefoneLimpo;
 
     const trx = await connection.transaction();
 
@@ -546,7 +557,7 @@ export const restaurarPedido = async (req, res, next) => {
                 deletado_em: null,
                 status: 'Pendente'
             })
-        
+
         // Log de Auditoria
         await connection('logs')
             .transacting(trx)
@@ -561,15 +572,15 @@ export const restaurarPedido = async (req, res, next) => {
                     status_novo: 'Pendente'
                 })
             });
-        
-            
+
+
         await trx.commit();
 
         return res.status(200).json({
             status: 'success',
             message: ' Pedido restaurado e enviado de volta para a lista de Pendentes'
         })
-        
+
     } catch (error) {
 
         if (trx) {
