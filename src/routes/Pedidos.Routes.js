@@ -123,7 +123,7 @@ router.post('/', criarPedido)
  *               status: "error"
  *               message: "Nenhum pedido encontrado para este telefone."
  */
-router.get('/cliente/:telefone', listarPedidosPorTelefoneUsuario)
+router.get('/rastreio/:telefone', listarPedidosPorTelefoneUsuario)
 
 router.use(verifyToken)
 
