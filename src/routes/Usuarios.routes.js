@@ -384,5 +384,6 @@ router.patch('/:id/ativar', checkPermission('usuarios.editar'), reativarUsuario)
  */
 router.patch('/:id/permissoes', checkPermission('permissoes.editar'), editarPermissoesDoUsuario);
 
+// teste de comentário
 
 export default router;
