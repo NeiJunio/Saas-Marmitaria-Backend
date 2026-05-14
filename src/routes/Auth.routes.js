@@ -94,4 +94,5 @@ router.post('/login', limitadorLogin, login);
  */
 router.post('/logout', logout);
 
+
 export default router;
