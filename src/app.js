@@ -70,7 +70,7 @@ app.use('/metodos-pagamentos', MetodosPagamentosRoutes)
 app.use('/pedidos', PedidosRoutes)
 app.use('/permissoes', PermissoesRoutes)
 app.use('/status-loja', StatusLojaRoutes)
-app.use('/tamanhos-marmitas', TamanhosMarmitasRoutes),
+app.use('/tamanhos-marmitas', TamanhosMarmitasRoutes)
 app.use('/usuarios', UsuariosRoutes)
 
 app.use(errorHandler)
