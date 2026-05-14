@@ -7,7 +7,7 @@ import {
     editarUsuario,
     inativarUsuario,
     reativarUsuario
-} from "../controllers/Usuarios.Controller.js";
+} from "../controllers/Users.Controller.js";
 
 import { editarPermissoesDoUsuario } from "../controllers/Permissions.Controller.js";
 

@@ -11,7 +11,7 @@ import PedidosRoutes from './routes/Pedidos.Routes.js'
 import PermissoesRoutes from './routes/Permissions.Routes.js'
 import StatusLojaRoutes from './routes/StatusLoja.Routes.js'
 import TamanhosMarmitasRoutes from './routes/TamanhosMarmitas.Routes.js'
-import UsuariosRoutes from './routes/Usuarios.Routes.js'
+import UsuariosRoutes from './routes/Users.Routes.js'
 
 import errorHandler from './middlewares/errorHandler.js';
 
