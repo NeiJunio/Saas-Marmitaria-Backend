@@ -4,7 +4,7 @@ import cookieParser from 'cookie-parser';
 import { limitadorGeral } from './middlewares/rateLimiter.js';
 
 import AlimentosRoutes from './routes/Alimentos.Routes.js'
-import AuthRoutes from './routes/Auth.Routes.js'
+import AuthRoutes from './routes/Autenticacao.Routes.js'
 import CategoriasAlimentosRoutes from './routes/CategoriaAlimento.Routes.js'
 import MetodosPagamentosRoutes from './routes/MetodosPagamentos.Routes.js'
 import PedidosRoutes from './routes/Pedidos.Routes.js'
