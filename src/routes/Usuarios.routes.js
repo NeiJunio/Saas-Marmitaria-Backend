@@ -9,7 +9,7 @@ import {
     reativarUsuario
 } from "../controllers/Usuarios.Controller.js";
 
-import { editarPermissoesDoUsuario } from "../controllers/Permissoes.Controller.js";
+import { editarPermissoesDoUsuario } from "../controllers/Permissions.Controller.js";
 
 import { limitadorCadastro } from "../middlewares/rateLimiter.js";
 

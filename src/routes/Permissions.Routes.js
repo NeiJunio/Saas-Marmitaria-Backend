@@ -5,7 +5,7 @@ import {
     listarPermissoesPorUsuario,
     listarPermissoesDoUsuarioLogado,
     editarPermissoesDoUsuario
- } from "../controllers/Permissoes.Controller.js";
+ } from "../controllers/Permissions.Controller.js";
 
 import { verifyToken } from "../middlewares/verifyToken.js";
 import { checkPermission } from "../middlewares/checkPermission.js";
