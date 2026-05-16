@@ -351,7 +351,7 @@ export const inativarUsuario = async (req, res, next) => {
     }
 };
 
-// Reativar o usuario
+// Reativar o usuario (teste)
 export const reativarUsuario = async (req, res, next) => {
     const trx = await connection.transaction();
 
