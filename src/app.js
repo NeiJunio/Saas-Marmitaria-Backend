@@ -7,6 +7,7 @@ import AlimentosRoutes from './routes/Alimentos.Routes.js'
 import AuthRoutes from './routes/Autenticacao.Routes.js'
 import CategoriasAlimentosRoutes from './routes/CategoriaAlimento.Routes.js'
 import MetodosPagamentosRoutes from './routes/MetodosPagamentos.Routes.js'
+import NiveisAcessoRoutes from './routes/NiveisAcesso.Routes.js'
 import PedidosRoutes from './routes/Pedidos.Routes.js'
 import PermissoesRoutes from './routes/Permissions.Routes.js'
 import StatusLojaRoutes from './routes/StatusLoja.Routes.js'
@@ -67,6 +68,7 @@ app.use('/alimentos', AlimentosRoutes)
 app.use('/auth', AuthRoutes)
 app.use('/categorias-alimentos', CategoriasAlimentosRoutes)
 app.use('/metodos-pagamentos', MetodosPagamentosRoutes)
+app.use('/niveis-acesso', NiveisAcessoRoutes)
 app.use('/pedidos', PedidosRoutes)
 app.use('/permissoes', PermissoesRoutes)
 app.use('/status-loja', StatusLojaRoutes)

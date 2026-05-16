@@ -304,92 +304,83 @@ export const editarUsuario = async (req, res, next) => {
 
 // Inativação do usuário
 export const inativarUsuario = async (req, res, next) => {
-
-    const trx = await connection.transaction()
-
-    try {
-        const { id } = req.params
-
-        const usuarioExiste = await connection('usuarios')
-            .transacting(trx)
-            .where('usuarios.id', id)
-            .whereNull('deletado_em')
-            .first()
-
-        if (!usuarioExiste) {
-            await trx.rollback()
-            lancarErro('Usuário não encontrado ou já se encontra inativo', 404);
-        }
-
-        const [usuario] = await connection('usuarios')
-            .transacting(trx)
-            .where('usuarios.id', id)
-            .update({
-                ativo: false,
-                deletado_em: connection.fn.now()
-            })
-            .returning(['nome'])
-
-        await connection('logs')
-            .transacting(trx)
-            .insert({
-                tipo: 'ACAO',
-                usuario_id: req.usuario.id,
-                metodo: req.method,
-                endpoint: req.originalUrl,
-                acao: 'USUARIOS.INATIVAR',
-                descricao: `${req.usuario.nome} inativou o acesso de ${usuario.nome}`,
-                payload: JSON.stringify({ id_afetado: id })
-            })
-
-        await trx.commit();
-        res.status(200).json({
-            status: 'success',
-            message: 'Usuário inativado com sucesso!'
-        });
-    } catch (error) {
-
-        if (trx) {
-
-            await trx.rollback();
-        }
-
-        next(error);
-
-    }
-}
-
-// Reativação do usuário
-export const reativarUsuario = async (req, res, next) => {
-
     const trx = await connection.transaction();
 
     try {
-
         const { id } = req.params;
 
+        // Alteramos a busca para encontrar o usuário se ele estiver ATIVO 
+        // e não estiver deletado.
         const usuarioExiste = await connection('usuarios')
             .transacting(trx)
-            .where('usuarios.id', id)
-            .whereNotNull('deletado_em')
-            .first()
+            .where('id', id)
+            .where('ativo', true) // Só inativa quem está ativo
+            .whereNull('deletado_em')
+            .first();
 
         if (!usuarioExiste) {
-
-            await trx.rollback()
-
-            lancarErro('Usuário não encontrado ou já se encontra ativo', 404);
-
+            await trx.rollback();
+            // Mensagem genérica para evitar confusão
+            return res.status(404).json({ message: 'Usuário não encontrado ou já está inativo' });
         }
 
         const [usuario] = await connection('usuarios')
             .transacting(trx)
-            .where('usuarios.id', id)
+            .where('id', id)
+            .update({
+                ativo: false,
+                deletado_em: connection.fn.now() // Mantemos o timestamp para auditoria
+            })
+            .returning(['nome']);
+
+        await connection('logs').transacting(trx).insert({
+            tipo: 'ACAO',
+            usuario_id: req.usuario.id,
+            metodo: req.method,
+            endpoint: req.originalUrl,
+            acao: 'USUARIOS.INATIVAR',
+            descricao: `${req.usuario.nome} inativou o acesso de ${usuario.nome}`,
+            payload: JSON.stringify({ id_afetado: id })
+        });
+
+        await trx.commit();
+        res.status(200).json({ message: 'Usuário inativado com sucesso!' });
+    } catch (error) {
+        if (trx) await trx.rollback();
+        next(error);
+    }
+};
+
+export const reativarUsuario = async (req, res, next) => {
+    const trx = await connection.transaction();
+
+    try {
+        const { id } = req.params;
+
+        // AQUI ESTÁ A CORREÇÃO:
+        // Buscamos o usuário se ele estiver inativo OU se tiver data de deleção
+        const usuarioInativo = await connection('usuarios')
+            .transacting(trx)
+            .where('id', id)
+            .andWhere(function() {
+                this.where('ativo', false)
+                    .orWhereNotNull('deletado_em');
+            })
+            .first();
+
+        if (!usuarioInativo) {
+            await trx.rollback();
+            return res.status(404).json({ message: 'Usuário não encontrado ou já está ativo' });
+        }
+
+        const [usuario] = await connection('usuarios')
+            .transacting(trx)
+            .where('id', id)
             .update({
                 ativo: true,
-                deletado_em: null
+                deletado_em: null // Limpamos o timestamp independente de como foi inativado
             })
-            .returning(['nome'])
+            .returning(['nome']);
 
         await connection('logs').transacting(trx).insert({
             tipo: 'ACAO',
@@ -402,19 +393,9 @@ export const reativarUsuario = async (req, res, next) => {
         });
 
         await trx.commit();
-
-        res.status(200).json({
-            status: 'success',
-            message: 'Usuário reativado com sucesso!'
-        });
-
+        res.status(200).json({ message: 'Usuário reativado com sucesso!' });
     } catch (error) {
-
-        if (trx) {
-
-            await trx.rollback();
-        }
-
+        if (trx) await trx.rollback();
         next(error);
     }
-}
+};

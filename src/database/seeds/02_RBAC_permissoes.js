@@ -17,6 +17,7 @@ export async function seed(knex) {
         { nome: 'usuarios.editar', descricao: 'Editar dados de funcionários' },
         { nome: 'usuarios.deletar', descricao: 'Remover funcionários do sistema' },
         { nome: 'usuarios.visualizar', descricao: 'Visualizar detalhes do usuário' },
+        { nome: 'usuarios.reativar', descricao: 'Reativar funcionário do sistema'},
 
         // Módulo: Cardápio (Alimentos)
         { nome: 'cardapio.listar', descricao: 'Visualizar itens do cardápio' },
@@ -65,7 +66,14 @@ export async function seed(knex) {
         { nome: 'metodos_pagamento.criar', descricao: 'Cadastrar novos métodos de pagamento' },
         { nome: 'metodos_pagamento.editar', descricao: 'Editar métodos de pagamento existentes' },
         { nome: 'metodos_pagamento.deletar', descricao: 'Remover métodos de pagamento do sistema' },
-        { nome: 'metodos_pagamento.restaurar', descricao: 'Restaurar métodos de pagamento excluídos' }
+        { nome: 'metodos_pagamento.restaurar', descricao: 'Restaurar métodos de pagamento excluídos' },
+
+        // --- NÍVEIS DE ACESSO ---
+        { nome: 'niveis_acesso.listar', descricao: 'Listar níveis de acesso' },
+        { nome: 'niveis_acesso.criar', descricao: 'Criar novos níveis de acesso' },
+        { nome: 'niveis_acesso.editar', descricao: 'Editar níveis de acesso existentes' },
+        { nome: 'niveis_acesso.deletar', descricao: 'Remover níveis de acesso do sistema' },
+        { nome: 'niveis_acesso.restaurar', descricao: 'Restaurar níveis de acesso excluídos' }
 
     ];
 
