@@ -7,13 +7,13 @@ export const listarAlimentos = async (req, res, next) => {
 
         const {
             page = 1,
-            limit = 10,
+            // limit = 10,
             search = '',
             categoria_alimento_id,
             status = 'todos'
         } = req.query;
 
-        const offset = (page - 1) * limit;
+        // const offset = (page - 1) * limit;
 
         const query = connection('alimentos')
             .join('categorias_alimentos', 'alimentos.categoria_id', '=', 'categorias_alimentos.id')
@@ -32,7 +32,7 @@ export const listarAlimentos = async (req, res, next) => {
             query.where('alimentos.ativo', true)
         }
 
-        // console.log("SQL GERADO: ", query.toString());
+        //  console.log("SQL GERADO: ", query.toString());
 
         const total = await query.clone().count('alimentos.id AS total').first();
 
@@ -42,8 +42,8 @@ export const listarAlimentos = async (req, res, next) => {
                 'categorias_alimentos.nome AS categoria_nome',
                 'categorias_alimentos.id AS categoria_id'
             ])
-            .limit(limit)
-            .offset(offset)
+            // .limit(limit)
+            // .offset(offset)
             .orderBy('alimentos.nome', 'ASC')
 
         return res.status(200).json({
