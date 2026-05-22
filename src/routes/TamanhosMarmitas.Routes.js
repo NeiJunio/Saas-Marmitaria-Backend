@@ -2,6 +2,7 @@ import { Router } from "express";
 
 import {
     listarTamanhosMarmitas,
+    listarTamanhosMarmitasAdmin,
     criarTamanhoMarmita,
     editarTamanhoMarmita,
     deletarTamanhoMarmita
@@ -65,6 +66,64 @@ const router = Router();
 router.get('/', listarTamanhosMarmitas);
 
 router.use(verifyToken);
+
+/**
+ * @swagger
+ * /tamanhos-marmitas/admin:
+ *   get:
+ *     summary: Lista todos os tamanhos de marmitas (admin)
+ *     description: Retorna uma lista paginada de tamanhos de marmitas com informações administrativas (requer autenticação e permissão)
+ *     tags: [TamanhosMarmitas]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Número da página
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Limite de registros por página
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Termo de busca por nome
+ *       - in: query
+ *         name: deletados
+ *         schema:
+ *           type: string
+ *           enum: [all, true, false]
+ *           default: all
+ *         description: Filtrar por status de exclusão
+ *     responses:
+ *       200:
+ *         description: Lista de tamanhos de marmitas (admin) retornada com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: "success"
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/TamanhoMarmita'
+ *                 pagination:
+ *                   $ref: '#/components/schemas/Pagination'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ */
+router.get('/admin', checkPermission('tamanhos_marmitas.listar'), listarTamanhosMarmitasAdmin)
 
 /**
  * @swagger

@@ -18,6 +18,22 @@ export const listarTamanhosMarmitas = async (req, res, next) => {
     }
 };
 
+export const listarTamanhosMarmitasAdmin = async (req, res, next) => {
+    try {
+        const tamanhos = await connection('tamanhos_marmitas')
+            .whereNull('deletado_em') 
+            .orderBy('preco_base', 'asc');
+
+        return res.status(200).json({
+            status: 'success',
+            results: tamanhos.length,
+            data: tamanhos
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
 export const criarTamanhoMarmita = async (req, res, next) => {
 
     const { nome, preco_base } = req.body;
