@@ -20,14 +20,80 @@ export const listarTamanhosMarmitas = async (req, res, next) => {
 
 export const listarTamanhosMarmitasAdmin = async (req, res, next) => {
     try {
-        const tamanhos = await connection('tamanhos_marmitas')
-            .whereNull('deletado_em') 
-            .orderBy('preco_base', 'asc');
+        const {
+            page = 1,
+            limit = 10,
+            search = '',
+            sort = 'id',
+            order = 'ASC',
+            deletados = 'all'
+        } = req.query;
+
+        const offset = (page - 1) * limit;
+
+        const query = connection('tamanhos_marmitas')
+            .select([
+                'id',
+                'nome',
+                'preco_base',
+                'ativo',
+                'deletado_em'
+            ]);
+
+        if (deletados === 'false') {
+            query.whereNull('deletado_em');
+        } else if (deletados === 'true') {
+            query.whereNotNull('deletado_em');
+        }
+
+        if (search) {
+            query.andWhere(function () {
+                this.where('nome', 'ilike', `%${search}%`);
+            });
+        }
+
+        const countQuery = await query.clone().clearSelect().count('id AS total').first();
+
+        const { total } = countQuery || { total: 0 };
+
+        const tamanhos = await query
+            .orderBy(sort, order)
+            .limit(limit)
+            .offset(offset);
+
+        return res.json({
+            status: 'success',
+            data: tamanhos,
+            pagination: {
+                total: parseInt(total || 0),
+                page: parseInt(page),
+                lastPage: Math.ceil((total || 0) / limit)
+            }
+        });
+
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const buscarTamanhoMarmitaPorId = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+
+        const tamanho = await connection('tamanhos_marmitas')
+            .where({ id })
+            .first();
+
+        if (!tamanho) {
+            return res.status(404).json({ 
+                status: 'error',
+                message: 'Tamanho de marmita não encontrado.' 
+            });
+        }
 
         return res.status(200).json({
             status: 'success',
-            results: tamanhos.length,
-            data: tamanhos
+            data: tamanho
         });
     } catch (error) {
         next(error);
@@ -176,7 +242,7 @@ export const editarTamanhoMarmita = async (req, res, next) => {
     }
 };
 
-export const deletarTamanhoMarmita = async (req, res, next) => {
+export const inativarTamanhoMarmita = async (req, res, next) => {
 
     const { id } = req.params;
     const usuario_id = req.usuario.id;
@@ -223,6 +289,65 @@ export const deletarTamanhoMarmita = async (req, res, next) => {
         return res.status(200).json({
             status: 'success',
             message: `Tamanho "${tamanho.nome}" removido com sucesso.`
+        });
+
+    } catch (error) {
+        if (trx) await trx.rollback();
+        next(error);
+    }
+};
+
+export const reativarTamanhoMarmita = async (req, res, next) => {
+
+    const { id } = req.params;
+    const usuario_id = req.usuario.id;
+
+    const trx = await connection.transaction();
+
+    try {
+        // 1. Validação: Busca o tamanho se ele estiver inativo OU se tiver data de deleção
+        const tamanhoInativo = await connection('tamanhos_marmitas')
+            .transacting(trx)
+            .where({ id })
+            .andWhere(function() {
+                this.where('ativo', false)
+                    .orWhereNotNull('deletado_em');
+            })
+            .first();
+
+        if (!tamanhoInativo) {
+            await trx.rollback();
+            return next(lancarErro('Tamanho não encontrado ou já está ativo.', 404));
+        }
+
+        // 2. Ação de reativação (Removendo o Soft Delete)
+        await connection('tamanhos_marmitas')
+            .transacting(trx)
+            .where({ id })
+            .update({
+                ativo: true,
+                deletado_em: null // Limpa o timestamp para restaurar o registro
+            });
+
+        // 3. Log de Auditoria
+        await connection('logs')
+            .transacting(trx)
+            .insert({
+                tipo: 'ACAO',
+                usuario_id,
+                acao: 'TAMANHO.REATIVAR',
+                descricao: `Reativou o tamanho #${id} (${tamanhoInativo.nome})`,
+                payload: JSON.stringify({
+                    id,
+                    nome: tamanhoInativo.nome
+                })
+            });
+
+        await trx.commit();
+        
+        return res.status(200).json({
+            status: 'success',
+            message: `Tamanho "${tamanhoInativo.nome}" reativado com sucesso.`
         });
 
     } catch (error) {

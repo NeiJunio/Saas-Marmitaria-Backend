@@ -2,9 +2,10 @@ import { Router } from "express";
 
 import {
     criarCategoriaDeAlimento,
-    deletarCategoriaDeAlimento,
     editarCategoriaDeAlimento,
-    listarCategoriasDeAlimentos
+    listarCategoriasDeAlimentos,
+    inativarCategoriaDeAlimento,
+    reativarCategoriaDeAlimento
 } from "../controllers/CategoriaAlimento.Controller.js";
 
 import { verifyToken } from "../middlewares/verifyToken.js";
@@ -224,6 +225,40 @@ router.patch('/:id', checkPermission('categorias_alimentos.editar'), editarCateg
  *       404:
  *         $ref: '#/components/responses/NotFound'
  */
-router.delete('/:id', checkPermission('categorias_alimentos.deletar'), deletarCategoriaDeAlimento)
+router.delete('/:id', checkPermission('categorias_alimentos.deletar'), inativarCategoriaDeAlimento);
 
+/**
+ * @swagger
+ * /categorias-alimentos/{id}/reativar:
+ *   patch:
+ *     summary: Reativa uma categoria de alimento inativada
+ *     description: Remove a data de exclusão lógica e reativa a categoria de alimento (requer autenticação e permissão)
+ *     tags: [Categorias Alimentos]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID da categoria de alimento
+ *     responses:
+ *       200:
+ *         description: Categoria de alimento reativada com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Success'
+ *             example:
+ *               status: "success"
+ *               message: "Categoria de alimento reativada com sucesso"
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ */
+router.patch('/:id/reativar', checkPermission('categorias_alimentos.editar'), reativarCategoriaDeAlimento);
 export default router;

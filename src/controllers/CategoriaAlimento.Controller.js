@@ -228,7 +228,7 @@ export const editarCategoriaDeAlimento = async (req, res, next) => {
     }
 }
 
-export const deletarCategoriaDeAlimento = async (req, res, next) => {
+export const inativarCategoriaDeAlimento = async (req, res, next) => {
 
     const { id } = req.params;
     const usuario_id = req.usuario.id;
@@ -241,6 +241,7 @@ export const deletarCategoriaDeAlimento = async (req, res, next) => {
         const categoriaAlimento = await connection('categorias_alimentos')
             .transacting(trx)
             .where({ id })
+            .where('ativo', true) // Só podemos deletar se estiver ativa, evita confusão de status
             .whereNull('deletado_em')
             .forUpdate() // Tranca a linha para evitar deleção dupla
             .first();
@@ -256,8 +257,8 @@ export const deletarCategoriaDeAlimento = async (req, res, next) => {
             .transacting(trx)
             .where({ id })
             .update({
-                deletado_em: connection.fn.now(),
-                ativo: false // Opcional: desativamos também para garantir que suma de listas simples
+                ativo: false, // Opcional: desativamos também para garantir que suma de listas simples
+                deletado_em: connection.fn.now()
             });
 
         // 3. Log de Auditoria
@@ -266,11 +267,11 @@ export const deletarCategoriaDeAlimento = async (req, res, next) => {
             .insert({
                 tipo: 'ACAO',
                 usuario_id: usuario_id,
-                acao: 'CATEGORIA_ALIMENTO.DELETAR',
-                descricao: `Exclusão (Soft Delete) da categoria #${id}: ${categoriaAlimento.nome}`,
+                acao: 'CATEGORIA_ALIMENTO.INATIVAR',
+                descricao: `Inativação da categoria #${id}: ${categoriaAlimento.nome}`,
                 payload: JSON.stringify({
                     recurso_id: id,
-                    dados_excluidos: {
+                    dados_inativados: {
                         nome: categoriaAlimento.nome,
                         limite: categoriaAlimento.limite_escolhas
                     },
@@ -285,13 +286,80 @@ export const deletarCategoriaDeAlimento = async (req, res, next) => {
 
         return res.status(200).json({
             status: 'success',
-            message: 'Categoria removida com sucesso.'
+            message: 'Categoria inativada com sucesso.'
         });
     } catch (error) {
         if (trx) {
             await trx.rollback();
         }
 
+        next(error);
+    }
+}
+
+
+export const reativarCategoriaDeAlimento = async (req, res, next) => {
+
+    const { id } = req.params;
+    const usuario_id = req.usuario.id;
+    
+    const trx = await connection.transaction();
+    try {
+        // 1. Verificar se a categoria existe e se está inativa
+        const categoriaAlimento = await connection('categorias_alimentos')
+            .transacting(trx)
+            .where({ id })
+            .andWhere(function() {
+                this.where('ativo', false)
+                    .orWhereNotNull('deletado_em');
+            })
+            .forUpdate() // Tranca a linha para evitar conflitos
+            .first();
+
+        if (!categoriaAlimento) {
+            await trx.rollback();
+            return next(lancarErro('Categoria não encontrada ou já ativa.', 404));
+        }
+
+        // 2. Reativar a categoria
+        await connection('categorias_alimentos')
+            .transacting(trx)
+            .where({ id })
+            .update({
+                ativo: true,
+                deletado_em: null
+            });
+        
+        await connection('logs')
+            .transacting(trx)
+            .insert({
+                tipo: 'ACAO',
+                usuario_id: usuario_id,
+                acao: 'CATEGORIA_ALIMENTO.REATIVAR',
+                descricao: `Reativação da categoria #${id}: ${categoriaInativa.nome}`,
+                payload: JSON.stringify({
+                    recurso_id: id,
+                    dados_reativados: {
+                        nome: categoriaInativa.nome,
+                        limite: categoriaInativa.limite_escolhas
+                    },
+                    contexto: {
+                        ip: req.ip,
+                        rota: req.originalUrl
+                    }
+                })
+            });
+        
+        await trx.commit();
+
+        return res.status(200).json({
+            status: 'success',
+            message: 'Categoria reativada com sucesso.'
+        });
+    } catch (error) {
+        if (trx) {
+            await trx.rollback();
+        }
         next(error);
     }
 }

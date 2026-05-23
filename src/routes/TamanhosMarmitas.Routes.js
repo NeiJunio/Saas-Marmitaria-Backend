@@ -5,7 +5,9 @@ import {
     listarTamanhosMarmitasAdmin,
     criarTamanhoMarmita,
     editarTamanhoMarmita,
-    deletarTamanhoMarmita
+    inativarTamanhoMarmita,
+    reativarTamanhoMarmita,
+    buscarTamanhoMarmitaPorId
 } from "../controllers/TamanhosMarmitas.Controller.js";
 
 import { verifyToken } from "../middlewares/verifyToken.js";
@@ -125,6 +127,46 @@ router.use(verifyToken);
  */
 router.get('/admin', checkPermission('tamanhos_marmitas.listar'), listarTamanhosMarmitasAdmin)
 
+/**
+ * @swagger
+ * /tamanhos-marmitas/{id}:
+ *   get:
+ *     summary: Retorna um tamanho de marmita pelo ID
+ *     description: Busca os dados de um tamanho de marmita específico (requer autenticação e permissão)
+ *     tags: [TamanhosMarmitas]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID do tamanho de marmita
+ *     responses:
+ *       200:
+ *         description: Tamanho de marmita encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Success'
+ *             example:
+ *               status: "success"
+ *               data:
+ *                 id: 1
+ *                 nome: "Grande"
+ *                 preco_base: 25.00
+ *                 ativo: true
+ *                 criado_em: "2026-05-01T14:25:31.000Z"
+ *                 atualizado_em: "2026-05-01T14:25:31.000Z"
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ */
+router.get('/:id', checkPermission('tamanhos_marmitas.visualizar'), buscarTamanhoMarmitaPorId);
 /**
  * @swagger
  * /tamanhos-marmitas:
@@ -256,6 +298,40 @@ router.patch('/:id', checkPermission('tamanhos_marmitas.editar'), editarTamanhoM
  *       404:
  *         $ref: '#/components/responses/NotFound'
  */
-router.delete('/:id', checkPermission('tamanhos_marmitas.deletar'), deletarTamanhoMarmita)
+router.delete('/:id', checkPermission('tamanhos_marmitas.deletar'), inativarTamanhoMarmita)
 
+/**
+ * @swagger
+ * /tamanhos-marmitas/{id}/reativar:
+ *   patch:
+ *     summary: Reativa um tamanho de marmita inativado
+ *     description: Remove a data de exclusão lógica e reativa o tamanho de marmita (requer autenticação e permissão)
+ *     tags: [TamanhosMarmitas]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID do tamanho de marmita
+ *     responses:
+ *       200:
+ *         description: Tamanho de marmita reativado com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Success'
+ *             example:
+ *               status: "success"
+ *               message: "Tamanho de marmita reativado com sucesso"
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ */
+router.patch('/:id/reativar', checkPermission('tamanhos_marmitas.editar'), reativarTamanhoMarmita);
 export default router;

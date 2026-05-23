@@ -441,6 +441,7 @@ const options = {
             { name: 'TamanhosMarmitas', description: 'Gerenciamento de tamanhos de marmitas' },
             { name: 'Alimentos', description: 'Gerenciamento de alimentos e cardápio' },
             { name: 'CategoriaAlimento', description: 'Categorias de alimentos' },
+            { name: 'Categorias Alimentos', description: 'Categorias de alimentos' },
             { name: 'StatusLoja', description: 'Status operacional da loja' },
         ],
     },
