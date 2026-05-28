@@ -65,6 +65,27 @@ export const listarCategoriasDeAlimentos = async (req, res, next) => {
     }
 }
 
+export const listarCategoriaDeAlimentoPorId = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+
+        const categoria = await connection('categorias_alimentos')
+            .where({ id })
+            .first();
+
+        if (!categoria) {
+            return next(lancarErro('Categoria não encontrada.', 404));
+        }
+
+        return res.status(200).json({
+            status: 'success',
+            data: categoria
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
 export const criarCategoriaDeAlimento = async (req, res, next) => {
     try {
 
@@ -302,14 +323,14 @@ export const reativarCategoriaDeAlimento = async (req, res, next) => {
 
     const { id } = req.params;
     const usuario_id = req.usuario.id;
-    
+
     const trx = await connection.transaction();
     try {
         // 1. Verificar se a categoria existe e se está inativa
         const categoriaAlimento = await connection('categorias_alimentos')
             .transacting(trx)
             .where({ id })
-            .andWhere(function() {
+            .andWhere(function () {
                 this.where('ativo', false)
                     .orWhereNotNull('deletado_em');
             })
@@ -329,19 +350,19 @@ export const reativarCategoriaDeAlimento = async (req, res, next) => {
                 ativo: true,
                 deletado_em: null
             });
-        
+
         await connection('logs')
             .transacting(trx)
             .insert({
                 tipo: 'ACAO',
                 usuario_id: usuario_id,
                 acao: 'CATEGORIA_ALIMENTO.REATIVAR',
-                descricao: `Reativação da categoria #${id}: ${categoriaInativa.nome}`,
+                descricao: `Reativação da categoria #${id}: ${categoriaAlimento.nome}`,
                 payload: JSON.stringify({
                     recurso_id: id,
                     dados_reativados: {
-                        nome: categoriaInativa.nome,
-                        limite: categoriaInativa.limite_escolhas
+                        nome: categoriaAlimento.nome,
+                        limite: categoriaAlimento.limite_escolhas
                     },
                     contexto: {
                         ip: req.ip,
@@ -349,7 +370,7 @@ export const reativarCategoriaDeAlimento = async (req, res, next) => {
                     }
                 })
             });
-        
+
         await trx.commit();
 
         return res.status(200).json({

@@ -4,6 +4,7 @@ import {
     criarCategoriaDeAlimento,
     editarCategoriaDeAlimento,
     listarCategoriasDeAlimentos,
+    listarCategoriaDeAlimentoPorId,
     inativarCategoriaDeAlimento,
     reativarCategoriaDeAlimento
 } from "../controllers/CategoriaAlimento.Controller.js";
@@ -72,6 +73,7 @@ router.use(verifyToken)
  *         $ref: '#/components/responses/Forbidden'
  */
 router.get('/', checkPermission('categorias_alimentos.listar'), listarCategoriasDeAlimentos)
+router.get('/:id', checkPermission('categorias_alimentos.visualizar'), listarCategoriaDeAlimentoPorId) 
 
 /**
  * @swagger
