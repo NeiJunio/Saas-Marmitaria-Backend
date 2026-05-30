@@ -2,9 +2,12 @@ import { Router } from "express";
 
 import {
     criarAlimento,
-    deletarAlimento,
+    inativarAlimento,
+    reativarAlimento,
     editarAlimento,
-    listarAlimentos
+    listarAlimentos,
+    listarAlimentosAdmin,
+    buscarAlimentoPorId
 } from "../controllers/Alimentos.Controller.js";
 import { verifyToken } from "../middlewares/verifyToken.js";
 import { checkPermission } from "../middlewares/checkPermission.js";
@@ -128,6 +131,8 @@ router.use(verifyToken);
  */
 router.post('/', checkPermission('alimentos.criar'), criarAlimento)
 
+router.get('/admin', checkPermission('alimentos.listar'), listarAlimentosAdmin)
+router.get('/:id', checkPermission('alimentos.listar'), buscarAlimentoPorId)
 /**
  * @swagger
  * /alimentos/{id}:
@@ -206,6 +211,7 @@ router.patch('/:id', checkPermission('alimentos.editar'), editarAlimento)
  *       404:
  *         $ref: '#/components/responses/NotFound'
  */
-router.delete('/:id', checkPermission('alimentos.deletar'), deletarAlimento)
+router.delete('/:id', checkPermission('alimentos.deletar'), inativarAlimento)
+router.patch('/:id/reativar', checkPermission('alimentos.editar'), reativarAlimento)
 
 export default router;

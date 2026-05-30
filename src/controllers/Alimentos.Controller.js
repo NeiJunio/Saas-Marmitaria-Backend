@@ -58,6 +58,73 @@ export const listarAlimentos = async (req, res, next) => {
 
 }
 
+export const listarAlimentosAdmin = async (req, res, next) => {
+    try {
+        const {
+            page = 1, limit = 10, search = '',
+            sort = 'id', order = 'ASC', excluidos = 'mixed'
+        } = req.query;
+
+        const offset = (page - 1) * limit;
+
+        const query = connection('alimentos as a')
+            .leftJoin('categorias_alimentos as c', 'a.categoria_id', 'c.id')
+            .select([
+                'a.id',
+                'a.nome',
+                'a.categoria_id',
+                'a.disponivel_hoje',
+                'a.deletado_em',
+                'c.nome as categoria_nome'
+            ]);
+
+        if (excluidos === 'false') query.whereNull('a.deletado_em');
+        if (excluidos === 'true') query.whereNotNull('a.deletado_em');
+
+        if (search) {
+            query.andWhere(function () {
+                this.where('a.nome', 'ilike', `%${search}%`);
+            });
+        }
+
+        const countQuery = await query.clone().clearSelect().count('a.id AS total').first();
+        const { total } = countQuery || { total: 0 };
+
+        // Evita ambiguidade na ordenação adicionando o prefixo da tabela
+        const sortColumn = sort === 'nome' ? 'a.nome' : `a.${sort}`;
+
+        const alimentos = await query
+            .orderBy(sortColumn, order)
+            .limit(limit)
+            .offset(offset);
+
+        return res.json({
+            status: 'success',
+            data: alimentos,
+            pagination: {
+                total: parseInt(total || 0),
+                page: parseInt(page),
+                last_page: Math.ceil((total || 0) / limit)
+            }
+        });
+
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const buscarAlimentoPorId = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const alimento = await connection('alimentos').where({ id }).first();
+
+        if (!alimento) return next(lancarErro('Alimento não encontrado.', 404));
+
+        return res.status(200).json({ status: 'success', data: alimento });
+    } catch (error) {
+        next(error);
+    }
+}
 
 export const criarAlimento = async (req, res, next) => {
 
@@ -262,68 +329,83 @@ export const editarAlimento = async (req, res, next) => {
 }
 
 
-export const deletarAlimento = async (req, res, next) => {
-
-    const { id } = req.params;
-    const usuario_id = req.usuario.id;
-
+export const inativarAlimento = async (req, res, next) => {
     const trx = await connection.transaction();
-
     try {
+        const { id } = req.params;
 
-        // Verificar se o alimento existe
         const alimento = await connection('alimentos')
-            .transacting(trx)
-            .where('id', id)
-            .whereNull('deletado_em')
-            .forUpdate()
-            .first()
+            .transacting(trx).where({ id }).whereNull('deletado_em').first();
 
         if (!alimento) {
             await trx.rollback();
-            return next(lancarErro('Alimento não encontrado ou já removido', 404));
+            return res.status(404).json({ message: 'Alimento não encontrado ou já inativo' });
         }
 
-        // Executando o soft delete preenchendo o campo 'deletado_em' com a data atual
         await connection('alimentos')
             .transacting(trx)
-            .where('id', id)
+            .where({ id })
             .update({
+                disponivel_hoje: false,
                 deletado_em: connection.fn.now()
             });
 
-        // Logs de auditoria
-        await connection('logs')
-            .transacting(trx)
-            .insert({
-                tipo: 'ACAO',
-                usuario_id: usuario_id,
-                acao: 'ALIMENTO.DELETAR',
-                descricao: `Exclusão (Soft Delete) do alimento #${id}: ${alimento.nome}`,
-                payload: JSON.stringify({
-                    id_alimento: id,
-                    nome_alimento: alimento.nome,
-                    categoria_alimento_id: alimento.categoria_id,
-                    contexto: {
-                        ip: req.ip,
-                        rota: req.originalUrl
-                    }
-                })
-            });
+        await connection('logs').transacting(trx).insert({
+            tipo: 'ACAO',
+            usuario_id: req.usuario.id,
+            metodo: req.method,
+            endpoint: req.originalUrl,
+            acao: 'ALIMENTO.INATIVAR',
+            descricao: `${req.usuario.nome || 'Usuário'} inativou o alimento ${alimento.nome}`,
+            payload: JSON.stringify({ id_afetado: id })
+        });
 
         await trx.commit();
-
-        return res.status(200).json({
-            status: 'success',
-            message: 'Alimento removido com sucesso'
-        })
-
+        res.status(200).json({ message: 'Alimento inativado!' });
     } catch (error) {
-        if (trx) {
-            await trx.rollback();
-        }
-
+        if (trx) await trx.rollback();
         next(error);
     }
+};
 
-}
+export const reativarAlimento = async (req, res, next) => {
+    const trx = await connection.transaction();
+    try {
+        const { id } = req.params;
+
+        const alimento = await connection('alimentos')
+            .transacting(trx)
+            .where({ id })
+            .whereNotNull('deletado_em')
+            .first();
+
+        if (!alimento) {
+            await trx.rollback();
+            return res.status(404).json({ message: 'Alimento não encontrado ou já ativo' });
+        }
+
+        await connection('alimentos')
+            .transacting(trx)
+            .where({ id })
+            .update({
+                disponivel_hoje: true,
+                deletado_em: null
+            });
+
+        await connection('logs').transacting(trx).insert({
+            tipo: 'ACAO',
+            usuario_id: req.usuario.id,
+            metodo: req.method,
+            endpoint: req.originalUrl,
+            acao: 'ALIMENTO.REATIVAR',
+            descricao: `${req.usuario.nome || 'Usuário'} reativou o alimento ${alimento.nome}`,
+            payload: JSON.stringify({ id_afetado: id })
+        });
+
+        await trx.commit();
+        res.status(200).json({ message: 'Alimento reativado!' });
+    } catch (error) {
+        if (trx) await trx.rollback();
+        next(error);
+    }
+};
