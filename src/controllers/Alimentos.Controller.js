@@ -409,3 +409,96 @@ export const reativarAlimento = async (req, res, next) => {
         next(error);
     }
 };
+// 🚀 1. Função para ligar/desligar a chavinha de um único alimento
+export const alternarDisponibilidade = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { disponivel_hoje } = req.body;
+
+        if (typeof disponivel_hoje !== 'boolean') {
+            return res.status(400).json({ message: 'O valor de disponivel_hoje deve ser um booleano (true ou false).' });
+        }
+
+        const atualizados = await connection('alimentos')
+            .where({ id })
+            .update({ disponivel_hoje });
+
+        if (atualizados === 0) {
+            return res.status(404).json({ message: 'Alimento não encontrado.' });
+        }
+
+        return res.status(200).json({ 
+            status: 'success', 
+            message: `Disponibilidade do alimento ${id} alterada para ${disponivel_hoje}` 
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// 🚀 2. Função "Fechar Loja": Desliga a chavinha de todos os alimentos ativos de uma vez
+export const zerarCardapio = async (req, res, next) => {
+    const trx = await connection.transaction();
+    try {
+        // Atualiza todos os alimentos para indisponível (apenas os que não foram excluídos)
+        await connection('alimentos')
+            .transacting(trx)
+            .whereNull('deletado_em')
+            .update({ disponivel_hoje: false });
+
+        await connection('status_loja') 
+            .transacting(trx)
+            // .where('id', req.usuario.tenant_id)
+            .update({ esta_aberta: false });
+        
+        // Salva no log de auditoria quem apertou o botão de fechar a loja
+        await connection('logs')
+            .transacting(trx)
+            .insert({
+                tipo: 'ACAO',
+                usuario_id: req.usuario.id, // Certifique-se de que o ID do usuário vem do seu middleware de auth
+                metodo: req.method,
+                endpoint: req.originalUrl,
+                acao: 'CARDAPIO.ZERAR',
+                descricao: `O usuário zerou o cardápio (Encerrou expediente)`,
+                payload: JSON.stringify({ acao: 'zerar_cardapio_diario' })
+            });
+
+        await trx.commit();
+        
+        return res.status(200).json({ 
+            status: 'success', 
+            message: 'Cardápio zerado com sucesso. Expediente encerrado!' 
+        });
+    } catch (error) {
+        if (trx) await trx.rollback();
+        next(error);
+    }
+};
+
+// 🚀 Função da Vitrine do Cliente
+export const listarCardapioParaCliente = async (req, res, next) => {
+    try {
+        const alimentos = await connection('alimentos as a')
+            .leftJoin('categorias_alimentos as c', 'a.categoria_id', 'c.id')
+            .select([
+                'a.id',
+                'a.nome',
+                'a.descricao',
+                'c.limite_escolhas',
+                'c.nome as categoria_nome'
+            ])
+            .where('a.disponivel_hoje', true)
+            .whereNull('a.deletado_em')
+            .where('a.disponivel_hoje', true) 
+            .orderBy('c.id', 'ASC') 
+            .orderBy('a.nome', 'ASC');
+
+        return res.status(200).json({
+            status: 'success',
+            data: alimentos
+        });
+    } catch (error) {
+        next(error);
+    }
+};
