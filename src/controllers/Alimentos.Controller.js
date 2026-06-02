@@ -40,7 +40,8 @@ export const listarAlimentos = async (req, res, next) => {
             .select([
                 'alimentos.*',
                 'categorias_alimentos.nome AS categoria_nome',
-                'categorias_alimentos.id AS categoria_id'
+                'categorias_alimentos.id AS categoria_id',
+                'categorias_alimentos.limite_escolhas'
             ])
             // .limit(limit)
             // .offset(offset)
