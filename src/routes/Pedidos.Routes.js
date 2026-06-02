@@ -129,7 +129,7 @@ router.use(verifyToken)
 
 /**
  * @swagger
- * /pedidos:
+ * /pedidos/admin:
  *   get:
  *     summary: Lista todos os pedidos
  *     description: Retorna uma lista de todos os pedidos (requer autenticação e permissão)
@@ -156,7 +156,7 @@ router.use(verifyToken)
  *       403:
  *         $ref: '#/components/responses/Forbidden'
  */
-router.get('/', checkPermission('pedidos.listar'), listarPedidosAdmin)
+router.get('/admin', checkPermission('pedidos.listar'), listarPedidosAdmin)
 
 /**
  * @swagger

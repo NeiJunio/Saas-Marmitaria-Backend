@@ -7,6 +7,7 @@ export const criarPedido = async (req, res, next) => {
         telefone_cliente,
         endereco_cliente,
         tipo_pedido,
+        metodo_entrega,
         metodo_pagamento_id,
         observacoes,
         marmitas
@@ -27,6 +28,16 @@ export const criarPedido = async (req, res, next) => {
 
     telefone_cliente = telefoneLimpo;
 
+    // 🚀 Validação da Entrega vs Retirada
+    if (metodo_entrega === 'Entrega' && (!endereco_cliente || endereco_cliente.trim() === '')) {
+        return res.status(400).json({ 
+            message: "O endereço é obrigatório para pedidos com entrega." 
+        });
+    }
+
+    // Se for retirada, garantimos que o endereço fica null no banco
+    const enderecoFinal = metodo_entrega === 'Retirada' ? null : endereco_cliente;
+
     const trx = await connection.transaction();
 
     try {
@@ -38,8 +49,9 @@ export const criarPedido = async (req, res, next) => {
             .insert({
                 nome_cliente,
                 telefone_cliente,
-                endereco_cliente,
+                endereco_cliente: enderecoFinal,
                 tipo_pedido,
+                metodo_entrega,
                 metodo_pagamento_id,
                 status: 'Pendente',
                 valor_total: 0,
