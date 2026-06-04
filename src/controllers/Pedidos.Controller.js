@@ -379,11 +379,71 @@ export const alterarStatusPedido = async (req, res, next) => {
 
 }
 
+// export const listarPedidosAdmin = async (req, res, next) => {
+
+//     try {
+
+//         const pedidos = await connection('pedidos')
+//             .select(
+//                 'pedidos.*',
+//                 connection.raw(`
+//                     ( SELECT json_agg(item) FROM (
+//                          select ip.id,
+//                                 tm.nome AS tamanho,
+//                                 ip.quantidade,
+//                                 ip.preco_unitario,
+//                                 ( SELECT json_agg(nome)
+//                                     FROM composicao_item_pedido AS cip
+//                                     JOIN alimentos              AS ali ON cip.alimento_id = ali.id
+//                                    WHERE cip.item_pedido_id = ip.id) AS alimentos
+//                         FROM itens_pedido      AS ip
+//                         JOIN tamanhos_marmitas AS tm ON ip.tamanho_marmita_id = tm.id
+//                        WHERE ip.pedido_id=pedidos.id ) item ) AS marmitas
+//                          `)
+//             )
+//             .whereNull('pedidos.deletado_em') // Mantém apenas os não deletados
+//             // .whereRaw("DATE(pedidos.criado_em) = CURRENT_DATE") // Removido para trazer todos
+//             .orderBy('pedidos.criado_em', 'desc'); // "desc" garante o mais recente no topo
+
+//         return res.status(200).json({
+//             status: 'success',
+//             data: pedidos
+//         });
+
+//     } catch (error) {
+//         next(error)
+//     }
+// }
+
 export const listarPedidosAdmin = async (req, res, next) => {
-
     try {
+        const { page = 1, limit = 10, search = '', status = 'todos' } = req.query;
+        const offset = (page - 1) * limit;
 
-        const pedidos = await connection('pedidos')
+        // 1. Criar a query base apenas com os filtros
+        const baseQuery = connection('pedidos').whereNull('pedidos.deletado_em');
+
+        if (search) {
+            baseQuery.where(function() {
+                this.where('nome_cliente', 'ILIKE', `%${search}%`)
+                    .orWhere('telefone_cliente', 'ILIKE', `%${search}%`);
+                
+                // Se a busca for um número, permite buscar pelo ID do pedido
+                if (!isNaN(search)) {
+                    this.orWhere('id', search);
+                }
+            });
+        }
+
+        if (status !== 'todos') {
+            baseQuery.where('status', status);
+        }
+
+        // 2. Contar o total de registros (para a paginação) ANTES de injetar a subquery pesada
+        const [{ total }] = await baseQuery.clone().count('id AS total');
+
+        // 3. Executar a query final com a paginação e a montagem do JSON das marmitas
+        const pedidos = await baseQuery
             .select(
                 'pedidos.*',
                 connection.raw(`
@@ -398,20 +458,25 @@ export const listarPedidosAdmin = async (req, res, next) => {
                                    WHERE cip.item_pedido_id = ip.id) AS alimentos
                         FROM itens_pedido      AS ip
                         JOIN tamanhos_marmitas AS tm ON ip.tamanho_marmita_id = tm.id
-                       WHERE ip.pedido_id=pedidos.id ) item ) AS marmitas
-                         `)
+                       WHERE ip.pedido_id = pedidos.id ) item ) AS marmitas
+                `)
             )
-            .whereNull('pedidos.deletado_em') // Mantém apenas os não deletados
-            // .whereRaw("DATE(pedidos.criado_em) = CURRENT_DATE") // Removido para trazer todos
-            .orderBy('pedidos.criado_em', 'desc'); // "desc" garante o mais recente no topo
+            .orderBy('pedidos.criado_em', 'desc')
+            .limit(limit)
+            .offset(offset);
 
         return res.status(200).json({
             status: 'success',
+            pagination: { 
+                total: parseInt(total), 
+                page: parseInt(page), 
+                totalPages: Math.ceil(parseInt(total) / limit) 
+            },
             data: pedidos
         });
 
     } catch (error) {
-        next(error)
+        next(error);
     }
 }
 
