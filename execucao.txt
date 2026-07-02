@@ -10,6 +10,7 @@ npm install cookies-parser'
 npm install chalk log-symbols
 npm install swagger-ui-express swagger-jsdoc
 npm install express-rate-limit
+npm install socket.io
 
 (implementar token bucket com redis)
 

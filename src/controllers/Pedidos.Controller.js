@@ -162,6 +162,37 @@ export const criarPedido = async (req, res, next) => {
 
         await trx.commit();
 
+        if (global.io){
+            try{
+                const[pedidoCompleto] = await connection('pedidos')
+                .select(
+                        'pedidos.*',
+                        connection.raw(`
+                            ( SELECT json_agg(item) FROM (
+                                select ip.id,
+                                        tm.nome AS tamanho,
+                                        ip.quantidade,
+                                        ip.preco_unitario,
+                                        ( SELECT json_agg(nome)
+                                            FROM composicao_item_pedido AS cip
+                                            JOIN alimentos              AS ali ON cip.alimento_id = ali.id
+                                           WHERE cip.item_pedido_id = ip.id) AS alimentos
+                                FROM itens_pedido      AS ip
+                                JOIN tamanhos_marmitas AS tm ON ip.tamanho_marmita_id = tm.id
+                               WHERE ip.pedido_id = pedidos.id ) item ) AS marmitas
+                        `)
+                    )
+                    .where('pedidos.id', pedido.id);
+
+                if(pedidoCompleto){
+                    global.io.emit('novo_pedido_recebido', pedidoCompleto);
+                }
+            }catch(socketErr){
+                console.error('Erro ao emitir evento de novo pedido:', socketErr);
+            }
+        }
+
+
         return res.status(201).json({
             status: 'success',
             data: {
