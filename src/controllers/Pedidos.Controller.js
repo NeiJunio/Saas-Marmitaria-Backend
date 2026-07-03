@@ -475,8 +475,10 @@ export const listarPedidosAdmin = async (req, res, next) => {
 
         // 3. Executar a query final com a paginação e a montagem do JSON das marmitas
         const pedidos = await baseQuery
+            .leftJoin('metodos_pagamento', 'pedidos.metodo_pagamento_id', 'metodos_pagamento.id')
             .select(
                 'pedidos.*',
+                'metodos_pagamento.nome AS metodo_pagamento_nome',
                 connection.raw(`
                     ( SELECT json_agg(item) FROM (
                          select ip.id,
@@ -495,6 +497,8 @@ export const listarPedidosAdmin = async (req, res, next) => {
             .orderBy('pedidos.criado_em', 'desc')
             .limit(limit)
             .offset(offset);
+
+
 
         return res.status(200).json({
             status: 'success',
