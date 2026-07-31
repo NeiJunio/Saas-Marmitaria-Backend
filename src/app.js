@@ -13,6 +13,7 @@ import PermissoesRoutes from './routes/Permissions.Routes.js'
 import StatusLojaRoutes from './routes/StatusLoja.Routes.js'
 import TamanhosMarmitasRoutes from './routes/TamanhosMarmitas.Routes.js'
 import UsuariosRoutes from './routes/Users.Routes.js'
+import RelatoriosRoutes from './routes/Relatorios.Routes.js'
 
 import errorHandler from './middlewares/errorHandler.js';
 
@@ -74,6 +75,8 @@ app.use('/permissoes', PermissoesRoutes)
 app.use('/status-loja', StatusLojaRoutes)
 app.use('/tamanhos-marmitas', TamanhosMarmitasRoutes)
 app.use('/usuarios', UsuariosRoutes)
+app.use('/relatorios', RelatoriosRoutes)
+
 
 app.use(errorHandler)
 
