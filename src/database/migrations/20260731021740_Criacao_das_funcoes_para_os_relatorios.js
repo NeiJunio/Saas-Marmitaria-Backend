@@ -77,7 +77,7 @@ export async function up(knex) {
     `);
 
     // ==========================================
-    // 3. Curva de Saída de Alimentos
+    // 3. Curva de Saída de Alimentos (Ajustado para tabelas intermediárias)
     // ==========================================
     await knex.raw(`
         CREATE OR REPLACE FUNCTION fn_rel_saida_alimentos(filtros json)
@@ -95,8 +95,9 @@ export async function up(knex) {
                 a.nome AS nome_alimento,
                 c.nome AS categoria_nome,
                 SUM(ip.quantidade)::bigint AS qtd_escolhida
-            FROM itens_pedido ip
-            JOIN alimentos a ON ip.alimento_id = a.id
+            FROM composicao_item_pedido cip
+            JOIN itens_pedido ip ON cip.item_pedido_id = ip.id
+            JOIN alimentos a ON cip.alimento_id = a.id
             JOIN categorias_alimentos c ON a.categoria_id = c.id
             JOIN pedidos p ON ip.pedido_id = p.id
             WHERE 
@@ -112,7 +113,7 @@ export async function up(knex) {
     `);
 
     // ==========================================
-    // 4. Vendas por Tamanho de Marmita
+    // 4. Vendas por Tamanho de Marmita (Ajustado para buscar em itens_pedido)
     // ==========================================
     await knex.raw(`
         CREATE OR REPLACE FUNCTION fn_rel_vendas_tamanho(filtros json)
@@ -127,17 +128,18 @@ export async function up(knex) {
         BEGIN
             RETURN QUERY
             SELECT 
-                t.nome AS tamanho_nome,
-                COUNT(p.id)::bigint AS qtd_vendida,
-                SUM(p.valor_total) AS faturamento_tamanho
-            FROM pedidos p
-            JOIN tamanhos t ON p.tamanho_id = t.id
+                tm.nome AS tamanho_nome,
+                SUM(ip.quantidade)::bigint AS qtd_vendida,
+                SUM(ip.subtotal) AS faturamento_tamanho
+            FROM itens_pedido ip
+            JOIN tamanhos_marmitas tm ON ip.tamanho_marmita_id = tm.id
+            JOIN pedidos p ON ip.pedido_id = p.id
             WHERE 
                 (v_data_inicio IS NULL OR p.criado_em::date >= v_data_inicio)
                 AND (v_data_fim IS NULL OR p.criado_em::date <= v_data_fim)
                 AND p.status != 'Cancelado'
             GROUP BY 
-                t.nome
+                tm.nome
             ORDER BY 
                 faturamento_tamanho DESC;
         END;
@@ -247,7 +249,7 @@ export async function up(knex) {
     `);
 
     // ==========================================
-    // 8. Listagem de Tamanhos
+    // 8. Listagem de Tamanhos (Ajustado para tabelas corretas)
     // ==========================================
     await knex.raw(`
         CREATE OR REPLACE FUNCTION fn_rel_listagem_tamanhos(filtros json)
@@ -262,23 +264,23 @@ export async function up(knex) {
         BEGIN
             RETURN QUERY
             SELECT 
-                t.id,
-                t.nome,
-                t.preco AS preco_base,
-                CASE WHEN t.ativo THEN 'Ativo' ELSE 'Inativo' END AS status_ativo
-            FROM tamanhos t
+                tm.id,
+                tm.nome,
+                tm.preco_base,
+                CASE WHEN tm.ativo THEN 'Ativo' ELSE 'Inativo' END AS status_ativo
+            FROM tamanhos_marmitas tm
             WHERE 
                 (v_status IS NULL OR v_status = 'todos' 
-                 OR (v_status = 'Ativo' AND t.ativo = true) 
-                 OR (v_status = 'Inativo' AND t.ativo = false))
+                 OR (v_status = 'Ativo' AND tm.ativo = true) 
+                 OR (v_status = 'Inativo' AND tm.ativo = false))
             ORDER BY 
-                t.preco ASC;
+                tm.preco_base ASC;
         END;
         $$ LANGUAGE plpgsql;
     `);
 
     // ==========================================
-    // 9. Listagem de Métodos de Pagamento
+    // 9. Listagem de Métodos de Pagamento (Ajustado para tabelas corretas)
     // ==========================================
     await knex.raw(`
         CREATE OR REPLACE FUNCTION fn_rel_listagem_pagamentos(filtros json)
@@ -292,16 +294,16 @@ export async function up(knex) {
         BEGIN
             RETURN QUERY
             SELECT 
-                m.id,
-                m.nome,
-                CASE WHEN m.ativo THEN 'Ativo' ELSE 'Inativo' END AS status_ativo
-            FROM formas_pagamento m
+                mp.id,
+                mp.nome,
+                CASE WHEN mp.ativo THEN 'Ativo' ELSE 'Inativo' END AS status_ativo
+            FROM metodos_pagamento mp
             WHERE 
                 (v_status IS NULL OR v_status = 'todos' 
-                 OR (v_status = 'Ativo' AND m.ativo = true) 
-                 OR (v_status = 'Inativo' AND m.ativo = false))
+                 OR (v_status = 'Ativo' AND mp.ativo = true) 
+                 OR (v_status = 'Inativo' AND mp.ativo = false))
             ORDER BY 
-                m.id ASC;
+                mp.id ASC;
         END;
         $$ LANGUAGE plpgsql;
     `);
@@ -312,7 +314,6 @@ export async function up(knex) {
  * @returns { Promise<void> }
  */
 export async function down(knex) {
-    // Drop de todas as funções na reversão da migration
     await knex.raw('DROP FUNCTION IF EXISTS fn_rel_faturamento_periodo(json);');
     await knex.raw('DROP FUNCTION IF EXISTS fn_rel_historico_vendas(json);');
     await knex.raw('DROP FUNCTION IF EXISTS fn_rel_saida_alimentos(json);');
