@@ -1,706 +1,2115 @@
 import connection from "../database/connection.js";
 import { lancarErro } from "../utils/errorUtils.js";
 
+import {
+    buscarPedidoCompletoPorId,
+    calcularTotalPedido,
+    deCentavos,
+    inserirMarmitasPedido,
+    inserirProdutosPedido,
+    normalizarTelefone,
+    selecionarMarmitasJson,
+    selecionarProdutosJson
+} from "../utils/pedidosUtils.js";
+
+
+/**
+ * ============================================================
+ * CRIAR PEDIDO
+ * ============================================================
+ *
+ * Regras principais:
+ * - o pedido deve possuir pelo menos uma marmita;
+ * - produtos são apenas complementos;
+ * - preços são sempre buscados pelo Backend;
+ * - o Frontend não controla preço, subtotal ou valor total.
+ */
 export const criarPedido = async (req, res, next) => {
-    let {
-        nome_cliente,
-        telefone_cliente,
-        endereco_cliente,
-        tipo_pedido,
-        metodo_entrega,
-        metodo_pagamento_id,
-        observacoes,
-        marmitas
-    } = req.body;
 
-    if (!marmitas || !Array.isArray(marmitas) || marmitas.length === 0) {
-        return next(lancarErro('O pedido deve conter pelo menos uma marmita', 400));
-    }
-
-    let telefoneLimpo = (telefone_cliente || '').replace(/\D/g, '');
-
-    if (telefoneLimpo.length < 10 || telefoneLimpo.length > 11) {
-        // Retorna o Erro 400 (Bad Request) que o seu frontend já sabe ler!
-        return res.status(400).json({
-            erro: "Telefone inválido. O telefone deve ter 10 ou 11 dígitos numéricos."
-        });
-    }
-
-    telefone_cliente = telefoneLimpo;
-
-    // 🚀 Validação da Entrega vs Retirada
-    if (metodo_entrega === 'Entrega' && (!endereco_cliente || endereco_cliente.trim() === '')) {
-        return res.status(400).json({ 
-            message: "O endereço é obrigatório para pedidos com entrega." 
-        });
-    }
-
-    // Se for retirada, garantimos que o endereço fica null no banco
-    const enderecoFinal = metodo_entrega === 'Retirada' ? null : endereco_cliente;
-
-    const trx = await connection.transaction();
+    let trx;
 
     try {
-        let valorTotalPedido = 0;
 
-        // 1. Criar o cabeçalho do pedido
-        const [pedido] = await connection('pedidos')
-            .transacting(trx)
-            .insert({
-                nome_cliente,
-                telefone_cliente,
-                endereco_cliente: enderecoFinal,
-                tipo_pedido,
-                metodo_entrega,
-                metodo_pagamento_id,
-                status: 'Pendente',
-                valor_total: 0,
-                observacoes
-            })
-            .returning('*');
+        let {
+            nome_cliente,
+            telefone_cliente,
+            endereco_cliente,
+            tipo_pedido,
+            metodo_entrega,
+            metodo_pagamento_id,
+            observacoes,
+            marmitas = [],
+            produtos = []
+        } = req.body || {};
 
-        // 2. Loop pelas marmitas
-        for (const marmita of marmitas) {
-            const { tamanho_id, quantidade, alimentos } = marmita;
 
-            // Busca o preço base do tamanho (Única fonte de valor)
-            const tamanho = await connection('tamanhos_marmitas')
+        if (
+            !Array.isArray(marmitas) ||
+            !Array.isArray(produtos)
+        ) {
+
+            lancarErro(
+                'Marmitas e produtos devem ser enviados como listas.',
+                400
+            );
+        }
+
+
+        /**
+         * Produtos não podem ser comprados separadamente.
+         */
+        if (marmitas.length === 0) {
+
+            lancarErro(
+                'Para finalizar o pedido é obrigatório adicionar pelo menos uma marmita com alimentos.',
+                400
+            );
+        }
+
+
+        telefone_cliente =
+            normalizarTelefone(
+                telefone_cliente
+            );
+
+
+        /**
+         * Entrega obrigatoriamente precisa de endereço.
+         */
+        if (
+            metodo_entrega === 'Entrega' &&
+            (
+                !endereco_cliente ||
+                String(
+                    endereco_cliente
+                ).trim() === ''
+            )
+        ) {
+
+            lancarErro(
+                'O endereço é obrigatório para pedidos com entrega.',
+                400
+            );
+        }
+
+
+        /**
+         * Retirada não precisa armazenar endereço.
+         */
+        const enderecoFinal =
+
+            metodo_entrega === 'Retirada'
+
+                ? null
+
+                : String(
+                    endereco_cliente || ''
+                ).trim() || null;
+
+
+        trx =
+            await connection.transaction();
+
+
+        /**
+         * =====================================================
+         * CABEÇALHO DO PEDIDO
+         * =====================================================
+         *
+         * Começamos com total zero.
+         *
+         * O Backend calculará o valor verdadeiro depois.
+         */
+        const [
+            pedido
+        ] =
+            await connection(
+                'pedidos'
+            )
+
                 .transacting(trx)
-                .where({
-                    id: tamanho_id,
-                    ativo: true
-                })
-                .first();
 
-            if (!tamanho) {
-                throw new Error(`Tamanho de marmita ID ${tamanho_id} não disponível.`);
-            }
-
-            // 3. Validar alimentos e buscar limites das categorias
-            const dadosAlimentos = await connection('alimentos')
-                .transacting(trx)
-                .join('categorias_alimentos', 'alimentos.categoria_id', '=', 'categorias_alimentos.id')
-                .select(
-                    'alimentos.id',
-                    'alimentos.categoria_id',
-                    'categorias_alimentos.nome AS cat_nome',
-                    'categorias_alimentos.limite_escolhas'
-                )
-                .whereIn('alimentos.id', alimentos)
-                .whereNull('alimentos.deletado_em')
-                .where('alimentos.disponivel_hoje', true);
-
-            if (dadosAlimentos.length !== alimentos.length) {
-                throw new Error('Um ou mais alimentos selecionados estão indisponíveis.');
-            }
-
-            // 4. Validar se respeitou o limite de escolhas (Ex: no máximo 2 carnes)
-            const contagemPorCategoria = {};
-            dadosAlimentos.forEach(alimento => {
-                if (!contagemPorCategoria[alimento.categoria_id]) {
-                    contagemPorCategoria[alimento.categoria_id] = {
-                        quantidade: 0,
-                        limite: alimento.limite_escolhas,
-                        nomeCat: alimento.cat_nome
-                    };
-                }
-                contagemPorCategoria[alimento.categoria_id].quantidade += 1;
-            });
-
-            for (const catId in contagemPorCategoria) {
-                const cat = contagemPorCategoria[catId];
-                if (cat.quantidade > cat.limite) {
-                    throw new Error(`Limite excedido na categoria ${cat.nomeCat}. Máximo: ${cat.limite}, Enviado: ${cat.quantidade}`);
-                }
-            }
-
-            // 5. Cálculos financeiros simples (Apenas tamanho * quantidade)
-            const precoUnitario = Number(tamanho.preco_base);
-            const subtotalMarmita = precoUnitario * quantidade;
-
-            const [itemPedido] = await connection('itens_pedido')
-                .transacting(trx)
                 .insert({
-                    pedido_id: pedido.id,
-                    tamanho_marmita_id: tamanho_id,
-                    quantidade: quantidade,
-                    preco_unitario: precoUnitario,
-                    subtotal: subtotalMarmita
+
+                    nome_cliente,
+
+                    telefone_cliente,
+
+                    endereco_cliente:
+                        enderecoFinal,
+
+                    tipo_pedido,
+
+                    metodo_entrega,
+
+                    metodo_pagamento_id,
+
+                    status:
+                        'Pendente',
+
+                    valor_total:
+                        0,
+
+                    observacoes
                 })
+
                 .returning('*');
 
-            // 6. Gravar quais alimentos compõem esta marmita específica
-            const composicaoParaInserir = alimentos.map(alimentoId => ({
-                item_pedido_id: itemPedido.id,
-                alimento_id: alimentoId
-            }));
 
-            await connection('composicao_item_pedido')
+        /**
+         * =====================================================
+         * MARMITAS
+         * =====================================================
+         *
+         * Utiliza o preço verdadeiro:
+         *
+         * tamanhos_marmitas.preco_base
+         */
+        const totalMarmitasCentavos =
+            await inserirMarmitasPedido({
+
+                pedidoId:
+                    pedido.id,
+
+                marmitas,
+
+                trx
+            });
+
+
+        /**
+         * =====================================================
+         * PRODUTOS
+         * =====================================================
+         *
+         * Utiliza o preço verdadeiro:
+         *
+         * produtos.preco
+         */
+        const totalProdutosCentavos =
+            await inserirProdutosPedido({
+
+                pedidoId:
+                    pedido.id,
+
+                produtos,
+
+                trx
+            });
+
+
+        /**
+         * =====================================================
+         * TOTAL DO PEDIDO
+         * =====================================================
+         */
+        const valorTotalCentavos =
+
+            totalMarmitasCentavos +
+
+            totalProdutosCentavos;
+
+
+        const valorTotalPedido =
+            deCentavos(
+                valorTotalCentavos
+            );
+
+
+        await connection(
+            'pedidos'
+        )
+
+            .transacting(trx)
+
+            .where({
+                id:
+                    pedido.id
+            })
+
+            .update({
+
+                valor_total:
+                    valorTotalPedido
+            });
+
+
+        /**
+         * =====================================================
+         * AUDITORIA
+         * =====================================================
+         */
+        await connection(
+            'logs'
+        )
+
+            .transacting(trx)
+
+            .insert({
+
+                tipo:
+                    'ACAO',
+
+                usuario_id:
+                    req.usuario?.id ||
+                    null,
+
+                metodo:
+                    req.method,
+
+                endpoint:
+                    req.originalUrl,
+
+                acao:
+                    'PEDIDO.CRIAR',
+
+                descricao:
+                    `Pedido #${pedido.id} para ${nome_cliente}. ` +
+                    `Total: R$ ${valorTotalPedido.toFixed(2)}`,
+
+                payload:
+                    JSON.stringify({
+
+                        pedido_id:
+                            pedido.id,
+
+                        total:
+                            valorTotalPedido,
+
+                        total_marmitas:
+                            deCentavos(
+                                totalMarmitasCentavos
+                            ),
+
+                        total_produtos:
+                            deCentavos(
+                                totalProdutosCentavos
+                            ),
+
+                        quantidade_marmitas:
+                            marmitas.length,
+
+                        quantidade_produtos:
+                            produtos.reduce(
+
+                                (
+                                    total,
+                                    produto
+                                ) =>
+
+                                    total +
+
+                                    Number(
+                                        produto
+                                            ?.quantidade ||
+                                        0
+                                    ),
+
+                                0
+                            )
+                    })
+            });
+
+
+        /**
+         * Tudo funcionou.
+         */
+        await trx.commit();
+
+
+        /**
+         * ========================================================
+         * ETAPA 6.7 — SOCKET.IO
+         * ========================================================
+         *
+         * O Socket NÃO recebe:
+         *
+         * - telefone;
+         * - endereço;
+         * - composição completa;
+         * - forma de pagamento;
+         * - observações.
+         *
+         * Ele serve apenas como aviso.
+         *
+         * Ao receber este evento, o painel administrativo
+         * deverá consultar novamente GET /pedidos/admin.
+         */
+        if (
+            global.io
+        ) {
+
+            global.io
+
+                .to(
+                    'pedidos'
+                )
+
+                .emit(
+
+                    'novo_pedido_recebido',
+
+                    {
+
+                        id:
+                            pedido.id,
+
+                        nome_cliente,
+
+                        status:
+                            'Pendente'
+                    }
+                );
+        }
+
+
+        return res
+            .status(201)
+            .json({
+
+                status:
+                    'success',
+
+                data: {
+
+                    pedido_id:
+                        pedido.id,
+
+                    total:
+                        valorTotalPedido,
+
+                    total_marmitas:
+                        deCentavos(
+                            totalMarmitasCentavos
+                        ),
+
+                    total_produtos:
+                        deCentavos(
+                            totalProdutosCentavos
+                        )
+                }
+            });
+
+
+    } catch (error) {
+
+        if (
+            trx &&
+            !trx.isCompleted()
+        ) {
+
+            await trx.rollback();
+        }
+
+
+        next(error);
+    }
+};
+
+
+/**
+ * ============================================================
+ * EDITAR PEDIDO
+ * ============================================================
+ *
+ * Marmitas e produtos podem ser alterados separadamente.
+ *
+ * Porém o pedido sempre precisa continuar possuindo
+ * pelo menos uma marmita com alimentos.
+ */
+export const editarPedido = async (
+    req,
+    res,
+    next
+) => {
+
+    let trx;
+
+
+    try {
+
+        const {
+            id
+        } = req.params;
+
+
+        const {
+
+            nome_cliente,
+
+            endereco_cliente,
+
+            telefone_cliente,
+
+            metodo_pagamento_id,
+
+            observacoes,
+
+            marmitas,
+
+            produtos
+
+        } = req.body || {};
+
+
+        /**
+         * Valida marmitas somente quando
+         * o campo tiver sido enviado.
+         */
+        if (
+            marmitas !== undefined &&
+            !Array.isArray(
+                marmitas
+            )
+        ) {
+
+            lancarErro(
+                'Marmitas deve ser uma lista.',
+                400
+            );
+        }
+
+
+        /**
+         * Valida produtos somente quando
+         * o campo tiver sido enviado.
+         */
+        if (
+            produtos !== undefined &&
+            !Array.isArray(
+                produtos
+            )
+        ) {
+
+            lancarErro(
+                'Produtos deve ser uma lista.',
+                400
+            );
+        }
+
+
+        /**
+         * Produtos não podem substituir a marmita.
+         */
+        if (
+            marmitas !== undefined &&
+            marmitas.length === 0
+        ) {
+
+            lancarErro(
+                'O pedido deve possuir pelo menos uma marmita com alimentos.',
+                400
+            );
+        }
+
+
+        const telefoneNormalizado =
+
+            telefone_cliente !== undefined
+
+                ? normalizarTelefone(
+                    telefone_cliente
+                )
+
+                : undefined;
+
+
+        const usuarioId =
+            req.usuario.id;
+
+
+        trx =
+            await connection.transaction();
+
+
+        /**
+         * Busca e bloqueia o pedido enquanto
+         * acontece a edição.
+         */
+        const pedido =
+            await connection(
+                'pedidos'
+            )
+
                 .transacting(trx)
-                .insert(composicaoParaInserir);
 
-            valorTotalPedido += subtotalMarmita;
-        }
+                .where(
+                    'id',
+                    id
+                )
 
-        // 7. Atualiza o total do pedido com a soma de todas as marmitas
-        await connection('pedidos')
-            .transacting(trx)
-            .where({ id: pedido.id })
-            .update({ valor_total: valorTotalPedido });
+                .whereNull(
+                    'deletado_em'
+                )
 
-        // 8. Auditoria
-        await connection('logs').transacting(trx).insert({
-            tipo: 'ACAO',
-            usuario_id: req.usuario?.id || null,
-            acao: 'PEDIDO.CRIAR',
-            descricao: `Pedido #${pedido.id} para ${nome_cliente}. Total: R$ ${valorTotalPedido.toFixed(2)}`,
-            payload: JSON.stringify({
-                pedido_id: pedido.id,
-                total: valorTotalPedido
-            })
-        });
+                .forUpdate()
 
-        await trx.commit();
+                .first();
 
-        if (global.io){
-            try{
-                const[pedidoCompleto] = await connection('pedidos')
-                .select(
-                        'pedidos.*',
-                        connection.raw(`
-                            ( SELECT json_agg(item) FROM (
-                                select ip.id,
-                                        tm.nome AS tamanho,
-                                        ip.quantidade,
-                                        ip.preco_unitario,
-                                        ( SELECT json_agg(nome)
-                                            FROM composicao_item_pedido AS cip
-                                            JOIN alimentos              AS ali ON cip.alimento_id = ali.id
-                                           WHERE cip.item_pedido_id = ip.id) AS alimentos
-                                FROM itens_pedido      AS ip
-                                JOIN tamanhos_marmitas AS tm ON ip.tamanho_marmita_id = tm.id
-                               WHERE ip.pedido_id = pedidos.id ) item ) AS marmitas
-                        `)
-                    )
-                    .where('pedidos.id', pedido.id);
-
-                if(pedidoCompleto){
-                    global.io.emit('novo_pedido_recebido', pedidoCompleto);
-                }
-            }catch(socketErr){
-                console.error('Erro ao emitir evento de novo pedido:', socketErr);
-            }
-        }
-
-
-        return res.status(201).json({
-            status: 'success',
-            data: {
-                pedido_id: pedido.id,
-                total: valorTotalPedido
-            }
-        });
-
-    } catch (error) {
-        if (trx) {
-            await trx.rollback();
-        }
-        return next(lancarErro(error.message, 400));
-    }
-}
-
-export const editarPedido = async (req, res, next) => {
-
-    const { id } = req.params;
-
-    const {
-        nome_cliente,
-        endereco_cliente,
-        telefone_cliente,
-        metodo_pagamento_id,
-        observacoes,
-        marmitas
-    } = req.body;
-
-    const usuario_id = req.usuario.id;
-
-    const trx = await connection.transaction();
-
-    try {
-
-        // verificar se o pedido existe
-        const pedido = await connection('pedidos')
-            .transacting(trx)
-            .where('id', id)
-            .first();
 
         if (!pedido) {
-            await trx.rollback();
-            return next(lancarErro('Pedido não encontrato', 404));
+
+            lancarErro(
+                'Pedido não encontrado.',
+                404
+            );
         }
 
-        if (pedido.status !== 'Pendente') {
-            await trx.rollback();
-            return next(lancarErro('Apenas pedidos com status "Pendente" podem ser editados', 400));
+
+        /**
+         * Somente pedidos pendentes podem
+         * ter sua composição modificada.
+         */
+        if (
+            pedido.status !==
+            'Pendente'
+        ) {
+
+            lancarErro(
+                'Apenas pedidos com status "Pendente" podem ser editados.',
+                400
+            );
         }
 
-        let novoValorTotal = Number(pedido.valor_total);
 
-        if (marmitas && Array.isArray(marmitas) && marmitas.length > 0) {
-            const itensAntigos = await connection('itens_pedido')
-                .where({ pedido_id: id })
-                .select('id');
+        /**
+         * =====================================================
+         * ATUALIZAÇÃO DAS MARMITAS
+         * =====================================================
+         */
+        if (
+            marmitas !== undefined
+        ) {
 
-            const itensIds = itensAntigos.map(i => i.id);
+            /**
+             * Localiza somente os itens
+             * que representam marmitas.
+             */
+            const itensMarmitas =
+                await connection(
+                    'itens_pedido'
+                )
 
-            await connection('composicao_item_pedido')
-                .whereIn('item_pedido_id', itensIds)
-                .del()
-                .transacting(trx);
+                    .transacting(trx)
 
-            await connection('itens_pedido')
-                .where({ pedido_id: id })
-                .del()
-                .transacting(trx);
-
-            novoValorTotal = 0;
-
-            for (const m of marmitas) {
-
-                const tamanho = await connection('tamanhos_marmitas')
                     .where({
-                        id: m.tamanho_id,
-                        ativo: true
+                        pedido_id:
+                            id
                     })
-                    .first();
 
-                if (!tamanho) {
-                    throw new Error(`Tamanho ID ${m.tamanho_id} indisponível`);
-                }
+                    .whereNotNull(
+                        'tamanho_marmita_id'
+                    )
 
-                const precoUnitario = Number(tamanho.preco_base);
-                const subtotalMarmita = precoUnitario * m.quantidade;
+                    .whereNull(
+                        'produto_id'
+                    )
 
-                const [itemPedido] = await connection('itens_pedido')
+                    .select(
+                        'id'
+                    );
+
+
+            const idsMarmitas =
+                itensMarmitas.map(
+                    item =>
+                        item.id
+                );
+
+
+            /**
+             * Remove composição anterior.
+             */
+            if (
+                idsMarmitas.length >
+                0
+            ) {
+
+                await connection(
+                    'composicao_item_pedido'
+                )
+
                     .transacting(trx)
-                    .insert({
-                        pedido_id: id,
-                        tamanho_marmita_id: m.tamanho_id,
-                        quantidade: m.quantidade,
-                        preco_unitario: precoUnitario,
-                        subtotal: subtotalMarmita
-                    })
-                    .returning('*');
 
-                const composicao = m.alimentos.map(alimentoId => ({
-                    item_pedido_id: itemPedido.id,
-                    alimento_id: alimentoId
-                }));
+                    .whereIn(
+                        'item_pedido_id',
+                        idsMarmitas
+                    )
 
-                await connection('composicao_item_pedido')
+                    .del();
+
+
+                /**
+                 * Remove somente os itens
+                 * que representam marmitas.
+                 */
+                await connection(
+                    'itens_pedido'
+                )
+
                     .transacting(trx)
-                    .insert(composicao);
 
-                novoValorTotal += subtotalMarmita;
+                    .whereIn(
+                        'id',
+                        idsMarmitas
+                    )
+
+                    .del();
+            }
+
+
+            /**
+             * Recria as marmitas usando
+             * novamente preços e alimentos
+             * validados pelo Backend.
+             */
+            await inserirMarmitasPedido({
+
+                pedidoId:
+                    Number(id),
+
+                marmitas,
+
+                trx
+            });
+        }
+
+
+        /**
+         * =====================================================
+         * ATUALIZAÇÃO DOS PRODUTOS
+         * =====================================================
+         */
+        if (
+            produtos !== undefined
+        ) {
+
+            /**
+             * Remove SOMENTE os produtos.
+             */
+            await connection(
+                'itens_pedido'
+            )
+
+                .transacting(trx)
+
+                .where({
+                    pedido_id:
+                        id
+                })
+
+                .whereNotNull(
+                    'produto_id'
+                )
+
+                .whereNull(
+                    'tamanho_marmita_id'
+                )
+
+                .del();
+
+
+            /**
+             * [] significa nenhum complemento.
+             */
+            if (
+                produtos.length >
+                0
+            ) {
+
+                await inserirProdutosPedido({
+
+                    pedidoId:
+                        Number(id),
+
+                    produtos,
+
+                    trx
+                });
             }
         }
-        else {
-            novoValorTotal = pedido.valor_total;
+
+
+        /**
+         * =====================================================
+         * GARANTIA FINAL
+         * =====================================================
+         *
+         * Precisamos garantir que exista pelo menos
+         * uma marmita que realmente tenha alimentos.
+         */
+        const marmitaComAlimento =
+            await connection(
+                'itens_pedido as ip'
+            )
+
+                .transacting(trx)
+
+                .join(
+
+                    'composicao_item_pedido as cip',
+
+                    'cip.item_pedido_id',
+
+                    '=',
+
+                    'ip.id'
+                )
+
+                .where(
+                    'ip.pedido_id',
+                    id
+                )
+
+                .whereNotNull(
+                    'ip.tamanho_marmita_id'
+                )
+
+                .whereNull(
+                    'ip.produto_id'
+                )
+
+                .first(
+                    'ip.id'
+                );
+
+
+        if (
+            !marmitaComAlimento
+        ) {
+
+            lancarErro(
+                'O pedido deve possuir pelo menos uma marmita com alimentos. Produtos não podem ser comprados separadamente.',
+                400
+            );
         }
 
-        // 3. Atualizar dados do cabeçalho
-        await connection('pedidos')
-            .transacting(trx)
-            .where({ id })
-            .update({
-                nome_cliente: nome_cliente ?? pedido.nome_cliente,
-                telefone_cliente: telefone_cliente ?? pedido.telefone_cliente,
-                endereco_cliente: endereco_cliente ?? pedido.endereco_cliente,
-                metodo_pagamento_id: metodo_pagamento_id ?? pedido.metodo_pagamento_id,
-                observacoes: observacoes !== undefined ? observacoes : pedido.observacoes,
-                valor_total: novoValorTotal,
-                atualizado_em: connection.fn.now()
-            });
 
-        // 3. Log de Auditoria (Agora novoValorTotal é garantido como número)
-        await connection('logs').transacting(trx).insert({
-            tipo: 'ACAO',
-            usuario_id,
-            acao: 'PEDIDO.EDITAR',
-            descricao: `Pedido #${id} editado. Cliente: ${nome_cliente ?? pedido.nome_cliente}. Total: R$ ${Number(novoValorTotal).toFixed(2)}`,
-            payload: JSON.stringify({
-                pedido_id: id,
-                campos_alterados: Object.keys(req.body)
+        /**
+         * Recalcula o total usando os valores
+         * já gravados em itens_pedido.
+         */
+        const novoValorTotalCentavos =
+            await calcularTotalPedido(
+                id,
+                trx
+            );
+
+
+        const novoValorTotal =
+            deCentavos(
+                novoValorTotalCentavos
+            );
+
+
+        const dadosAtualizacao = {
+
+            nome_cliente:
+                nome_cliente ??
+                pedido.nome_cliente,
+
+            telefone_cliente:
+                telefoneNormalizado ??
+                pedido.telefone_cliente,
+
+            endereco_cliente:
+
+                endereco_cliente !==
+                undefined
+
+                    ? endereco_cliente
+
+                    : pedido
+                        .endereco_cliente,
+
+            metodo_pagamento_id:
+                metodo_pagamento_id ??
+                pedido
+                    .metodo_pagamento_id,
+
+            observacoes:
+
+                observacoes !==
+                undefined
+
+                    ? observacoes
+
+                    : pedido
+                        .observacoes,
+
+            valor_total:
+                novoValorTotal,
+
+            atualizado_em:
+                connection.fn.now()
+        };
+
+
+        await connection(
+            'pedidos'
+        )
+
+            .transacting(trx)
+
+            .where({
+                id
             })
-        });
 
-        await trx.commit();
+            .update(
+                dadosAtualizacao
+            );
 
-        return res.status(200).json({
-            status: 'success',
-            message: 'Pedido atualizado com sucesso.'
-        });
 
-    } catch (error) {
-        if (trx) {
-            await trx.rollback();
-        }
+        /**
+         * Auditoria.
+         */
+        await connection(
+            'logs'
+        )
 
-        return next(lancarErro(error.message, 400));
-    }
-}
-
-export const alterarStatusPedido = async (req, res, next) => {
-
-    const { id } = req.params;
-    const { status } = req.body;
-    const usuario_id = req.usuario.id
-
-    const statusValidos = [
-        'Pendente',
-        'Em Preparo',
-        'Pronto para Retirada',
-        'Saiu para Entrega',
-        'Entregue',
-        'Cancelado'
-    ];
-
-    if (!statusValidos.includes(status)) {
-        return next(lancarErro(`Status inválido. Use: ${statusValidos.join(', ')}`, 400));
-    }
-
-    const trx = await connection.transaction();
-
-    try {
-
-        const pedido = await connection('pedidos')
-            .where('id', id)
-            .first();
-
-        if (!pedido) {
-            await trx.rollback();
-            return next(lancarErro('Pedido não encontrado', 404));
-        }
-
-        await connection('pedidos')
             .transacting(trx)
-            .where('id', id)
-            .update({
-                status: status
+
+            .insert({
+
+                tipo:
+                    'ACAO',
+
+                usuario_id:
+                    usuarioId,
+
+                metodo:
+                    req.method,
+
+                endpoint:
+                    req.originalUrl,
+
+                acao:
+                    'PEDIDO.EDITAR',
+
+                descricao:
+                    `Pedido #${id} editado. Cliente: ` +
+                    `${dadosAtualizacao.nome_cliente}. ` +
+                    `Total: R$ ${novoValorTotal.toFixed(2)}`,
+
+                payload:
+                    JSON.stringify({
+
+                        pedido_id:
+                            Number(id),
+
+                        campos_alterados:
+                            Object.keys(
+                                req.body
+                            ),
+
+                        valor_total_anterior:
+                            Number(
+                                pedido
+                                    .valor_total
+                            ),
+
+                        valor_total_novo:
+                            novoValorTotal
+                    })
             });
 
-        await connection('logs').transacting(trx).insert({
-            tipo: 'ACAO',
-            usuario_id,
-            acao: 'PEDIDO.STATUS',
-            descricao: `Status alterado: de "${pedido.status}" para "${status}"`,
-            payload: JSON.stringify({ pedido_id: id, status_novo: status })
-        });
 
         await trx.commit();
-        return res.status(200).json({ status: 'success', message: `Status atualizado para ${status}` });
+
+
+        /**
+         * ========================================================
+         * ETAPA 6.8 — PEDIDO EDITADO
+         * ========================================================
+         *
+         * Outros painéis administrativos serão avisados
+         * para recarregar a lista através da API.
+         */
+        if (
+            global.io
+        ) {
+
+            global.io
+
+                .to(
+                    'pedidos'
+                )
+
+                .emit(
+
+                    'pedido_atualizado',
+
+                    {
+
+                        pedido_id:
+                            Number(id),
+
+                        evento:
+                            'editado'
+                    }
+                );
+        }
+
+
+        /**
+         * Retorna o pedido completo após a edição.
+         */
+        const pedidoAtualizado =
+            await buscarPedidoCompletoPorId(
+                id
+            );
+
+
+        return res
+            .status(200)
+            .json({
+
+                status:
+                    'success',
+
+                message:
+                    'Pedido atualizado com sucesso.',
+
+                data:
+                    pedidoAtualizado
+            });
+
 
     } catch (error) {
-        if (trx) {
+
+        if (
+            trx &&
+            !trx.isCompleted()
+        ) {
+
             await trx.rollback();
         }
+
 
         next(error);
     }
+};
 
-}
 
-// export const listarPedidosAdmin = async (req, res, next) => {
+/**
+ * ============================================================
+ * ALTERAR STATUS DO PEDIDO
+ * ============================================================
+ */
+export const alterarStatusPedido = async (
+    req,
+    res,
+    next
+) => {
 
-//     try {
+    let trx;
 
-//         const pedidos = await connection('pedidos')
-//             .select(
-//                 'pedidos.*',
-//                 connection.raw(`
-//                     ( SELECT json_agg(item) FROM (
-//                          select ip.id,
-//                                 tm.nome AS tamanho,
-//                                 ip.quantidade,
-//                                 ip.preco_unitario,
-//                                 ( SELECT json_agg(nome)
-//                                     FROM composicao_item_pedido AS cip
-//                                     JOIN alimentos              AS ali ON cip.alimento_id = ali.id
-//                                    WHERE cip.item_pedido_id = ip.id) AS alimentos
-//                         FROM itens_pedido      AS ip
-//                         JOIN tamanhos_marmitas AS tm ON ip.tamanho_marmita_id = tm.id
-//                        WHERE ip.pedido_id=pedidos.id ) item ) AS marmitas
-//                          `)
-//             )
-//             .whereNull('pedidos.deletado_em') // Mantém apenas os não deletados
-//             // .whereRaw("DATE(pedidos.criado_em) = CURRENT_DATE") // Removido para trazer todos
-//             .orderBy('pedidos.criado_em', 'desc'); // "desc" garante o mais recente no topo
 
-//         return res.status(200).json({
-//             status: 'success',
-//             data: pedidos
-//         });
-
-//     } catch (error) {
-//         next(error)
-//     }
-// }
-
-export const listarPedidosAdmin = async (req, res, next) => {
     try {
-        const { page = 1, limit = 10, search = '', status = 'todos' } = req.query;
-        const offset = (page - 1) * limit;
 
-        // 1. Criar a query base apenas com os filtros
-        const baseQuery = connection('pedidos').whereNull('pedidos.deletado_em');
+        const {
+            id
+        } = req.params;
 
-        if (search) {
-            baseQuery.where(function() {
-                this.where('nome_cliente', 'ILIKE', `%${search}%`)
-                    .orWhere('telefone_cliente', 'ILIKE', `%${search}%`);
-                
-                // Se a busca for um número, permite buscar pelo ID do pedido
-                if (!isNaN(search)) {
-                    this.orWhere('id', search);
+
+        const {
+            status
+        } = req.body || {};
+
+
+        const usuarioId =
+            req.usuario.id;
+
+
+        const statusValidos = [
+
+            'Pendente',
+
+            'Em Preparo',
+
+            'Pronto para Retirada',
+
+            'Saiu para Entrega',
+
+            'Entregue',
+
+            'Cancelado'
+        ];
+
+
+        /**
+         * Status precisa fazer parte
+         * do ENUM/regra do sistema.
+         */
+        if (
+            !statusValidos.includes(
+                status
+            )
+        ) {
+
+            lancarErro(
+
+                `Status inválido. Use: ${statusValidos.join(', ')}`,
+
+                400
+            );
+        }
+
+
+        trx =
+            await connection.transaction();
+
+
+        /**
+         * Busca e trava o pedido.
+         */
+        const pedido =
+            await connection(
+                'pedidos'
+            )
+
+                .transacting(trx)
+
+                .where(
+                    'id',
+                    id
+                )
+
+                .whereNull(
+                    'deletado_em'
+                )
+
+                .forUpdate()
+
+                .first();
+
+
+        if (!pedido) {
+
+            lancarErro(
+                'Pedido não encontrado.',
+                404
+            );
+        }
+
+
+        /**
+         * ========================================================
+         * ETAPA 6.9
+         * STATUS COERENTE COM ENTREGA / RETIRADA
+         * ========================================================
+         */
+
+
+        /**
+         * RETIRADA nunca pode:
+         *
+         * Saiu para Entrega
+         */
+        if (
+            pedido.metodo_entrega ===
+                'Retirada'
+
+            &&
+
+            status ===
+                'Saiu para Entrega'
+        ) {
+
+            lancarErro(
+                'Pedidos de retirada não podem receber o status "Saiu para Entrega".',
+                400
+            );
+        }
+
+
+        /**
+         * ENTREGA nunca pode:
+         *
+         * Pronto para Retirada
+         */
+        if (
+            pedido.metodo_entrega ===
+                'Entrega'
+
+            &&
+
+            status ===
+                'Pronto para Retirada'
+        ) {
+
+            lancarErro(
+                'Pedidos de entrega não podem receber o status "Pronto para Retirada".',
+                400
+            );
+        }
+
+
+        /**
+         * Evita UPDATE e LOG desnecessários
+         * quando nada realmente mudou.
+         */
+        if (
+            pedido.status ===
+            status
+        ) {
+
+            await trx.rollback();
+
+
+            return res
+                .status(200)
+                .json({
+
+                    status:
+                        'success',
+
+                    message:
+                        'O pedido já possui este status.'
+                });
+        }
+
+
+        /**
+         * Atualiza status.
+         */
+        await connection(
+            'pedidos'
+        )
+
+            .transacting(trx)
+
+            .where({
+                id
+            })
+
+            .update({
+
+                status,
+
+                atualizado_em:
+                    connection.fn.now()
+            });
+
+
+        /**
+         * Auditoria.
+         */
+        await connection(
+            'logs'
+        )
+
+            .transacting(trx)
+
+            .insert({
+
+                tipo:
+                    'ACAO',
+
+                usuario_id:
+                    usuarioId,
+
+                metodo:
+                    req.method,
+
+                endpoint:
+                    req.originalUrl,
+
+                acao:
+                    'PEDIDO.STATUS',
+
+                descricao:
+                    `Status do pedido #${id} alterado ` +
+                    `de "${pedido.status}" para "${status}".`,
+
+                payload:
+                    JSON.stringify({
+
+                        pedido_id:
+                            Number(id),
+
+                        status_anterior:
+                            pedido.status,
+
+                        status_novo:
+                            status,
+
+                        metodo_entrega:
+                            pedido
+                                .metodo_entrega
+                    })
+            });
+
+
+        await trx.commit();
+
+
+        /**
+         * ========================================================
+         * ETAPA 6.8 — STATUS ALTERADO
+         * ========================================================
+         *
+         * Todos os outros painéis recebem um aviso.
+         */
+        if (
+            global.io
+        ) {
+
+            global.io
+
+                .to(
+                    'pedidos'
+                )
+
+                .emit(
+
+                    'pedido_atualizado',
+
+                    {
+
+                        pedido_id:
+                            Number(id),
+
+                        evento:
+                            'status',
+
+                        status
+                    }
+                );
+        }
+
+
+        return res
+            .status(200)
+            .json({
+
+                status:
+                    'success',
+
+                message:
+                    `Status atualizado para ${status}`
+            });
+
+
+    } catch (error) {
+
+        if (
+            trx &&
+            !trx.isCompleted()
+        ) {
+
+            await trx.rollback();
+        }
+
+
+        next(error);
+    }
+};
+
+
+/**
+ * ============================================================
+ * LISTAGEM ADMINISTRATIVA DOS PEDIDOS
+ * ============================================================
+ *
+ * Retorna:
+ *
+ * marmitas: []
+ * produtos: []
+ */
+export const listarPedidosAdmin = async (
+    req,
+    res,
+    next
+) => {
+
+    try {
+
+        const {
+
+            page = 1,
+
+            limit = 10,
+
+            search = '',
+
+            status = 'todos'
+
+        } = req.query;
+
+
+        /**
+         * Paginação protegida.
+         */
+        const pagina =
+            Math.max(
+
+                Number.parseInt(
+                    page,
+                    10
+                ) || 1,
+
+                1
+            );
+
+
+        const porPagina =
+            Math.min(
+
+                Math.max(
+
+                    Number.parseInt(
+                        limit,
+                        10
+                    ) || 10,
+
+                    1
+                ),
+
+                100
+            );
+
+
+        const offset =
+
+            (
+                pagina - 1
+            )
+
+            *
+
+            porPagina;
+
+
+        /**
+         * Query base.
+         */
+        const baseQuery =
+            connection(
+                'pedidos'
+            )
+
+                .whereNull(
+                    'pedidos.deletado_em'
+                );
+
+
+        /**
+         * Busca.
+         */
+        if (
+            String(
+                search
+            ).trim()
+        ) {
+
+            const termo =
+                String(
+                    search
+                ).trim();
+
+
+            baseQuery.where(
+                function () {
+
+                    this
+                        .where(
+                            'nome_cliente',
+                            'ILIKE',
+                            `%${termo}%`
+                        )
+
+                        .orWhere(
+                            'telefone_cliente',
+                            'ILIKE',
+                            `%${termo}%`
+                        );
+
+
+                    /**
+                     * Permite pesquisar:
+                     *
+                     * 125
+                     *
+                     * diretamente pelo ID.
+                     */
+                    if (
+                        /^\d+$/.test(
+                            termo
+                        )
+                    ) {
+
+                        this.orWhere(
+                            'pedidos.id',
+                            Number(
+                                termo
+                            )
+                        );
+                    }
                 }
-            });
+            );
         }
 
-        if (status !== 'todos') {
-            baseQuery.where('status', status);
-        }
 
-        // 2. Contar o total de registros (para a paginação) ANTES de injetar a subquery pesada
-        const [{ total }] = await baseQuery.clone().count('id AS total');
+        /**
+         * Filtro por status.
+         */
+        if (
+            status !==
+            'todos'
+        ) {
 
-        // 3. Executar a query final com a paginação e a montagem do JSON das marmitas
-        const pedidos = await baseQuery
-            .leftJoin('metodos_pagamento', 'pedidos.metodo_pagamento_id', 'metodos_pagamento.id')
-            .select(
-                'pedidos.*',
-                'metodos_pagamento.nome AS metodo_pagamento_nome',
-                connection.raw(`
-                    ( SELECT json_agg(item) FROM (
-                         select ip.id,
-                                tm.nome AS tamanho,
-                                ip.quantidade,
-                                ip.preco_unitario,
-                                ( SELECT json_agg(nome)
-                                    FROM composicao_item_pedido AS cip
-                                    JOIN alimentos              AS ali ON cip.alimento_id = ali.id
-                                   WHERE cip.item_pedido_id = ip.id) AS alimentos
-                        FROM itens_pedido      AS ip
-                        JOIN tamanhos_marmitas AS tm ON ip.tamanho_marmita_id = tm.id
-                       WHERE ip.pedido_id = pedidos.id ) item ) AS marmitas
-                `)
-            )
-            .orderBy('pedidos.criado_em', 'desc')
-            .limit(limit)
-            .offset(offset);
-
-
-
-        return res.status(200).json({
-            status: 'success',
-            pagination: { 
-                total: parseInt(total), 
-                page: parseInt(page), 
-                totalPages: Math.ceil(parseInt(total) / limit) 
-            },
-            data: pedidos
-        });
-
-    } catch (error) {
-        next(error);
-    }
-}
-
-export const listarPedidosPorTelefoneUsuario = async (req, res, next) => {
-
-    const { telefone } = req.params;
-
-    if (!telefone || telefone.length < 8) {
-        return res.status(400).json({
-            status: 'error',
-            message: 'Por favor, informe um número de telefone válido com DDD.'
-        });
-    }
-
-    try {
-        const pedidos = await connection('pedidos')
-            .select(
-                'pedidos.id',
-                'pedidos.nome_cliente',
+            baseQuery.where(
                 'pedidos.status',
-                'pedidos.valor_total',
-                'pedidos.metodo_pagamento_id',
-                'pedidos.endereco_cliente',
-                'pedidos.observacoes',
-                'pedidos.criado_em',
-                connection.raw(`
-                    ( SELECT json_agg(item) FROM (
-                        SELECT ip.id, 
-                               tm.nome as tamanho, 
-                               ip.quantidade, 
-                               ip.preco_unitario,
-                               ( SELECT json_agg(a.nome) 
-                                   FROM composicao_item_pedido AS cip 
-                                   JOIN alimentos              AS a ON a.id = cip.alimento_id 
-                                  WHERE cip.item_pedido_id = ip.id) as alimentos
-                          FROM itens_pedido      AS ip
-                          JOIN tamanhos_marmitas AS tm ON tm.id = ip.tamanho_marmita_id
-                         WHERE ip.pedido_id = pedidos.id
-                    ) item) as marmitas
-                `)
+                status
+            );
+        }
+
+
+        /**
+         * Total sem paginação.
+         */
+        const [
+            {
+                total
+            }
+        ] =
+            await baseQuery
+
+                .clone()
+
+                .count(
+                    'pedidos.id as total'
+                );
+
+
+        /**
+         * Pedidos completos.
+         */
+        const pedidos =
+            await baseQuery
+
+                .clone()
+
+                .leftJoin(
+
+                    'metodos_pagamento',
+
+                    'pedidos.metodo_pagamento_id',
+
+                    '=',
+
+                    'metodos_pagamento.id'
+                )
+
+                .select(
+
+                    'pedidos.*',
+
+                    'metodos_pagamento.nome as metodo_pagamento_nome',
+
+                    /**
+                     * JSON das marmitas.
+                     */
+                    selecionarMarmitasJson(),
+
+                    /**
+                     * JSON dos produtos.
+                     */
+                    selecionarProdutosJson()
+                )
+
+                .orderBy(
+                    'pedidos.criado_em',
+                    'desc'
+                )
+
+                .limit(
+                    porPagina
+                )
+
+                .offset(
+                    offset
+                );
+
+
+        const totalRegistros =
+            Number(
+                total || 0
+            );
+
+
+        return res
+            .status(200)
+            .json({
+
+                status:
+                    'success',
+
+                pagination: {
+
+                    total:
+                        totalRegistros,
+
+                    page:
+                        pagina,
+
+                    per_page:
+                        porPagina,
+
+                    totalPages:
+                        Math.max(
+
+                            Math.ceil(
+
+                                totalRegistros /
+
+                                porPagina
+                            ),
+
+                            1
+                        )
+                },
+
+                data:
+                    pedidos
+            });
+
+
+    } catch (error) {
+
+        next(error);
+    }
+};
+
+
+/**
+ * ============================================================
+ * RASTREIO PÚBLICO POR TELEFONE
+ * ============================================================
+ *
+ * Também retorna:
+ *
+ * marmitas
+ * produtos
+ */
+export const listarPedidosPorTelefoneUsuario =
+async (
+    req,
+    res,
+    next
+) => {
+
+    try {
+
+        /**
+         * Normaliza inclusive o telefone
+         * recebido pela URL.
+         */
+        const telefone =
+            normalizarTelefone(
+                req.params.telefone
+            );
+
+
+        const pedidos =
+            await connection(
+                'pedidos'
             )
-            .where('pedidos.telefone_cliente', telefone)
-            .whereNull('pedidos.deletado_em') // Não mostra pedidos excluídos pelo admin
-            .orderBy('pedidos.criado_em', 'desc');
 
-        if (pedidos.length === 0) {
-            return res.status(404).json({
-                status: 'error',
-                message: 'Nenhum pedido encontrado para este número de telefone.'
-            });
+                .select(
+
+                    'pedidos.id',
+
+                    'pedidos.nome_cliente',
+
+                    'pedidos.status',
+
+                    'pedidos.valor_total',
+
+                    'pedidos.metodo_pagamento_id',
+
+                    'pedidos.metodo_entrega',
+
+                    'pedidos.endereco_cliente',
+
+                    'pedidos.observacoes',
+
+                    'pedidos.criado_em',
+
+                    selecionarMarmitasJson(),
+
+                    selecionarProdutosJson()
+                )
+
+                .where(
+                    'pedidos.telefone_cliente',
+                    telefone
+                )
+
+                .whereNull(
+                    'pedidos.deletado_em'
+                )
+
+                .orderBy(
+                    'pedidos.criado_em',
+                    'desc'
+                );
+
+
+        if (
+            pedidos.length ===
+            0
+        ) {
+
+            return res
+                .status(404)
+                .json({
+
+                    status:
+                        'error',
+
+                    message:
+                        'Nenhum pedido encontrado para este número de telefone.'
+                });
         }
 
-        return res.status(200).json({
-            status: 'success',
-            results: pedidos.length,
-            data: pedidos
-        });
+
+        return res
+            .status(200)
+            .json({
+
+                status:
+                    'success',
+
+                results:
+                    pedidos.length,
+
+                data:
+                    pedidos
+            });
+
 
     } catch (error) {
-        next(error)
+
+        next(error);
     }
+};
 
-}
 
-export const deletarPedido = async (req, res, next) => {
+/**
+ * ============================================================
+ * SOFT DELETE DO PEDIDO
+ * ============================================================
+ */
+export const deletarPedido = async (
+    req,
+    res,
+    next
+) => {
 
-    const { id } = req.params;
-    const usuario_id = req.usuario.id;
+    let trx;
 
-    const trx = await connection.transaction();
 
     try {
 
-        const pedido = await connection('pedidos')
-            .where('id', id)
-            .whereNull('deletado_em')
-            .first();
+        const {
+            id
+        } = req.params;
+
+
+        const usuarioId =
+            req.usuario.id;
+
+
+        trx =
+            await connection.transaction();
+
+
+        /**
+         * Busca e trava o pedido.
+         */
+        const pedido =
+            await connection(
+                'pedidos'
+            )
+
+                .transacting(trx)
+
+                .where(
+                    'id',
+                    id
+                )
+
+                .whereNull(
+                    'deletado_em'
+                )
+
+                .forUpdate()
+
+                .first();
+
 
         if (!pedido) {
-            await trx.rollback();
-            return next(lancarErro('Pedido não encontrado ou já foi excluído', 404));
+
+            lancarErro(
+                'Pedido não encontrado ou já foi excluído.',
+                404
+            );
         }
 
-        await connection('pedidos')
+
+        /**
+         * Soft delete.
+         *
+         * Também cancela o pedido.
+         */
+        await connection(
+            'pedidos'
+        )
+
             .transacting(trx)
-            .where('id', id)
+
+            .where({
+                id
+            })
+
             .update({
-                status: 'Cancelado',
-                deletado_em: connection.fn.now()
+
+                status:
+                    'Cancelado',
+
+                deletado_em:
+                    connection.fn.now(),
+
+                atualizado_em:
+                    connection.fn.now()
             });
 
-        await connection('logs')
+
+        /**
+         * Auditoria.
+         */
+        await connection(
+            'logs'
+        )
+
             .transacting(trx)
+
             .insert({
-                tipo: 'ACAO',
-                usuario_id,
-                acao: 'PEDIDO.DELETAR',
-                descricao: `Admin realizou soft delete no pedido #${id} do cliente ${pedido.nome_cliente}`,
-                payload: JSON.stringify({
-                    pedido_id: id,
-                    valor_total: pedido.valor_total,
-                    status_anterior: pedido.status
-                })
+
+                tipo:
+                    'ACAO',
+
+                usuario_id:
+                    usuarioId,
+
+                metodo:
+                    req.method,
+
+                endpoint:
+                    req.originalUrl,
+
+                acao:
+                    'PEDIDO.DELETAR',
+
+                descricao:
+                    `Admin realizou soft delete no pedido #${id} ` +
+                    `do cliente ${pedido.nome_cliente}.`,
+
+                payload:
+                    JSON.stringify({
+
+                        pedido_id:
+                            Number(id),
+
+                        valor_total:
+                            Number(
+                                pedido
+                                    .valor_total
+                            ),
+
+                        status_anterior:
+                            pedido.status
+                    })
             });
+
 
         await trx.commit();
 
-        return res.status(200).json({
-            status: 'success',
-            message: 'Pedido excluído com sucesso.'
-        });
+
+        /**
+         * ========================================================
+         * ETAPA 6.8 — PEDIDO REMOVIDO
+         * ========================================================
+         */
+        if (
+            global.io
+        ) {
+
+            global.io
+
+                .to(
+                    'pedidos'
+                )
+
+                .emit(
+
+                    'pedido_atualizado',
+
+                    {
+
+                        pedido_id:
+                            Number(id),
+
+                        evento:
+                            'removido'
+                    }
+                );
+        }
+
+
+        return res
+            .status(200)
+            .json({
+
+                status:
+                    'success',
+
+                message:
+                    'Pedido excluído com sucesso.'
+            });
 
 
     } catch (error) {
-        if (trx) {
+
+        if (
+            trx &&
+            !trx.isCompleted()
+        ) {
+
             await trx.rollback();
         }
+
+
         next(error);
     }
+};
 
-}
 
-export const restaurarPedido = async (req, res, next) => {
+/**
+ * ============================================================
+ * RESTAURAR PEDIDO
+ * ============================================================
+ */
+export const restaurarPedido = async (
+    req,
+    res,
+    next
+) => {
 
-    const { id } = req.params;
+    let trx;
 
-    const usuario_id = req.usuario.id;
-
-    const trx = await connection.transaction();
 
     try {
 
-        const pedido = await connection('pedidos')
-            .where('id', id)
-            .first();
+        const {
+            id
+        } = req.params;
+
+
+        const usuarioId =
+            req.usuario.id;
+
+
+        trx =
+            await connection.transaction();
+
+
+        /**
+         * Busca e trava o pedido removido.
+         */
+        const pedido =
+            await connection(
+                'pedidos'
+            )
+
+                .transacting(trx)
+
+                .where(
+                    'id',
+                    id
+                )
+
+                .forUpdate()
+
+                .first();
+
 
         if (!pedido) {
-            await trx.rollback();
-            return next(lancarErro('Pedido não encontrado', 404));
+
+            lancarErro(
+                'Pedido não encontrado.',
+                404
+            );
         }
 
-        if (pedido.deletado_em === null) {
+
+        /**
+         * Pedido já está ativo.
+         */
+        if (
+            pedido.deletado_em ===
+            null
+        ) {
+
             await trx.rollback();
-            return res.status(400).json({
-                status: 'error',
-                message: 'Este pedido já está ativo (não excluído)'
-            })
+
+
+            return res
+                .status(400)
+                .json({
+
+                    status:
+                        'error',
+
+                    message:
+                        'Este pedido já está ativo (não excluído).'
+                });
         }
 
-        // Update
-        await connection('pedidos')
+
+        /**
+         * Restaura e devolve para Pendentes.
+         */
+        await connection(
+            'pedidos'
+        )
+
             .transacting(trx)
-            .where('id', id)
+
+            .where({
+                id
+            })
+
             .update({
-                deletado_em: null,
-                status: 'Pendente'
-            })
 
-        // Log de Auditoria
-        await connection('logs')
+                deletado_em:
+                    null,
+
+                status:
+                    'Pendente',
+
+                atualizado_em:
+                    connection.fn.now()
+            });
+
+
+        /**
+         * Auditoria.
+         */
+        await connection(
+            'logs'
+        )
+
             .transacting(trx)
+
             .insert({
-                tipo: 'ACAO',
-                usuario_id,
-                acao: 'PEDIDO.RESTAURAR',
-                descricao: `Admin restaurou o pedido #${id} do cliente ${pedido.nome_cliente}`,
-                payload: JSON.stringify({
-                    pedido_id: id,
-                    status_anterior: pedido.status,
-                    status_novo: 'Pendente'
-                })
+
+                tipo:
+                    'ACAO',
+
+                usuario_id:
+                    usuarioId,
+
+                metodo:
+                    req.method,
+
+                endpoint:
+                    req.originalUrl,
+
+                acao:
+                    'PEDIDO.RESTAURAR',
+
+                descricao:
+                    `Admin restaurou o pedido #${id} ` +
+                    `do cliente ${pedido.nome_cliente}.`,
+
+                payload:
+                    JSON.stringify({
+
+                        pedido_id:
+                            Number(id),
+
+                        status_anterior:
+                            pedido.status,
+
+                        status_novo:
+                            'Pendente'
+                    })
             });
 
 
         await trx.commit();
 
-        return res.status(200).json({
-            status: 'success',
-            message: ' Pedido restaurado e enviado de volta para a lista de Pendentes'
-        })
+
+        /**
+         * ========================================================
+         * ETAPA 6.8 — PEDIDO RESTAURADO
+         * ========================================================
+         */
+        if (
+            global.io
+        ) {
+
+            global.io
+
+                .to(
+                    'pedidos'
+                )
+
+                .emit(
+
+                    'pedido_atualizado',
+
+                    {
+
+                        pedido_id:
+                            Number(id),
+
+                        evento:
+                            'restaurado',
+
+                        status:
+                            'Pendente'
+                    }
+                );
+        }
+
+
+        return res
+            .status(200)
+            .json({
+
+                status:
+                    'success',
+
+                message:
+                    'Pedido restaurado e enviado de volta para a lista de Pendentes.'
+            });
+
 
     } catch (error) {
 
-        if (trx) {
+        if (
+            trx &&
+            !trx.isCompleted()
+        ) {
+
             await trx.rollback();
         }
 
+
         next(error);
-
     }
-
-}
+};

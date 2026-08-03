@@ -15,6 +15,10 @@ import TamanhosMarmitasRoutes from './routes/TamanhosMarmitas.Routes.js'
 import UsuariosRoutes from './routes/Users.Routes.js'
 import RelatoriosRoutes from './routes/Relatorios.Routes.js'
 
+// Novos módulos de produtos.
+import CategoriasProdutosRoutes from './routes/CategoriaProduto.Routes.js';
+import ProdutosRoutes from './routes/Produtos.Routes.js';
+
 import errorHandler from './middlewares/errorHandler.js';
 
 import swaggerUi from 'swagger-ui-express';
@@ -77,6 +81,9 @@ app.use('/tamanhos-marmitas', TamanhosMarmitasRoutes)
 app.use('/usuarios', UsuariosRoutes)
 app.use('/relatorios', RelatoriosRoutes)
 
+// Novas APIs.
+app.use('/categorias-produtos', CategoriasProdutosRoutes);
+app.use('/produtos', ProdutosRoutes);
 
 app.use(errorHandler)
 

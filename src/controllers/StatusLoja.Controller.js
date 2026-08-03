@@ -23,65 +23,180 @@ export const buscarStatusLoja = async (req, res, next) => {
 }
 
 
-export const alterarStatusLoja = async (req, res, next) => {
+export const alterarStatusLoja = async (
+    req,
+    res,
+    next
+) => {
 
-    if (!req.body || Object.keys(req.body).length === 0) {
-        return next(lancarErro('O corpo da requisição não pode estar vazio.', 400));
-    }
+    let trx;
 
-    const { esta_aberta } = req.body;
-
-    const trx = await connection.transaction();
 
     try {
 
-        if (esta_aberta !== undefined && typeof esta_aberta !== 'boolean') {
-            (await trx).rollback();
-            return next(lancarErro('O valor do parâmetro esta_aberta deve ser true ou false', 400))
+        if (
+            !req.body ||
+            Object.keys(
+                req.body
+            ).length === 0
+        ) {
+
+            lancarErro(
+                'O corpo da requisição não pode estar vazio.',
+                400
+            );
         }
 
-        const atualizado = await connection('status_loja')
+
+        const {
+            esta_aberta
+        } = req.body;
+
+
+        if (
+            typeof esta_aberta !==
+            'boolean'
+        ) {
+
+            lancarErro(
+                'O valor do parâmetro esta_aberta deve ser true ou false.',
+                400
+            );
+        }
+
+
+        trx =
+            await connection.transaction();
+
+
+        const statusAtual =
+            await connection(
+                'status_loja'
+            )
+
+                .transacting(trx)
+
+                .where({
+                    id: 1
+                })
+
+                .forUpdate()
+
+                .first();
+
+
+        if (!statusAtual) {
+
+            lancarErro(
+                'Configuração inicial da loja não encontrada.',
+                404
+            );
+        }
+
+
+        if (
+            statusAtual.esta_aberta ===
+            esta_aberta
+        ) {
+
+            await trx.rollback();
+
+
+            return res.status(200).json({
+
+                status:
+                    'success',
+
+                message:
+                    `A loja já está ${esta_aberta
+                        ? 'ABERTA'
+                        : 'FECHADA'
+                    }.`
+            });
+        }
+
+
+        await connection(
+            'status_loja'
+        )
+
             .transacting(trx)
+
+            .where({
+                id: 1
+            })
+
             .update({
-                esta_aberta: esta_aberta
-            })
-            .where('status_loja.id', 1)
+                esta_aberta
+            });
 
-        if (atualizado === 0) {
-            await rollback();
 
-            return next(lancarErro('Não foi possível atualizar: Registro inicial não encontrado.'))
-        }
-
-        // Log de auditoria
         await connection('logs')
+
             .transacting(trx)
+
             .insert({
-                tipo: 'ACAO',
-                usuario_id: req.usuario.id,
-                metodo: req.method,
-                endpoint: req.originalUrl,
-                acao: 'LOJA.STATUS',
-                descricao: `${req.usuario.nome} alterou o status da loja para: ${esta_aberta ? 'ABERTA' : 'FECHADA'}`,
-                payload: JSON.stringify({ novo_status: esta_aberta })
-            })
+
+                tipo:
+                    'ACAO',
+
+                usuario_id:
+                    req.usuario.id,
+
+                metodo:
+                    req.method,
+
+                endpoint:
+                    req.originalUrl,
+
+                acao:
+                    'LOJA.STATUS',
+
+                descricao:
+                    `${req.usuario.nome} alterou o status da loja para: ${esta_aberta
+                        ? 'ABERTA'
+                        : 'FECHADA'
+                    }`,
+
+                payload:
+                    JSON.stringify({
+
+                        status_anterior:
+                            statusAtual.esta_aberta,
+
+                        novo_status:
+                            esta_aberta
+                    })
+            });
+
 
         await trx.commit();
 
+
         return res.status(200).json({
-            status: 'success',
-            message: `A loja está ${esta_aberta ? 'ABERTA' : 'FECHADA'}`
-        })
+
+            status:
+                'success',
+
+            message:
+                `A loja está ${esta_aberta
+                    ? 'ABERTA'
+                    : 'FECHADA'
+                }.`
+        });
 
 
     } catch (error) {
 
-        if (trx) {
+        if (
+            trx &&
+            !trx.isCompleted()
+        ) {
 
             await trx.rollback();
         }
 
-        next(error)
-    }
 
-}
+        next(error);
+    }
+};

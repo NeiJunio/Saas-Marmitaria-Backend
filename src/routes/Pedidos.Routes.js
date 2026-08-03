@@ -127,6 +127,34 @@ router.get('/rastreio/:telefone', listarPedidosPorTelefoneUsuario)
 
 router.use(verifyToken)
 
+router.get(
+    '/admin',
+    checkPermission('pedidos.listar'),
+    listarPedidosAdmin
+);
+
+router.patch(
+    '/:id',
+    checkPermission('pedidos.editar'),
+    editarPedido
+);
+
+/**
+ * Pedido criado pelo PDV administrativo.
+ *
+ * Utiliza o mesmo Controller, porém agora req.usuario
+ * estará disponível para auditoria e permissões.
+ */
+router.post(
+    '/admin',
+
+    checkPermission(
+        'pedidos.criar'
+    ),
+
+    criarPedido
+);
+
 /**
  * @swagger
  * /pedidos/admin:
