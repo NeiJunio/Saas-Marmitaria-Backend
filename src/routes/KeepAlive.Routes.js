@@ -1,7 +1,7 @@
 // src/routes/keepAliveRoutes.js
 
 import express from 'express';
-import { ping } from '../controllers/keepAlive.Controller.js';
+import { ping } from '../controllers/KeepAlive.Controller.js';
 
 const router = express.Router();
 
