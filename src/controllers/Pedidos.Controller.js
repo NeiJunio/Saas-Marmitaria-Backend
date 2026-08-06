@@ -815,7 +815,7 @@ export const editarPedido = async (
             endereco_cliente:
 
                 endereco_cliente !==
-                undefined
+                    undefined
 
                     ? endereco_cliente
 
@@ -830,7 +830,7 @@ export const editarPedido = async (
             observacoes:
 
                 observacoes !==
-                undefined
+                    undefined
 
                     ? observacoes
 
@@ -1108,12 +1108,12 @@ export const alterarStatusPedido = async (
          */
         if (
             pedido.metodo_entrega ===
-                'Retirada'
+            'Retirada'
 
             &&
 
             status ===
-                'Saiu para Entrega'
+            'Saiu para Entrega'
         ) {
 
             lancarErro(
@@ -1130,12 +1130,12 @@ export const alterarStatusPedido = async (
          */
         if (
             pedido.metodo_entrega ===
-                'Entrega'
+            'Entrega'
 
             &&
 
             status ===
-                'Pronto para Retirada'
+            'Pronto para Retirada'
         ) {
 
             lancarErro(
@@ -1594,107 +1594,107 @@ export const listarPedidosAdmin = async (
  * produtos
  */
 export const listarPedidosPorTelefoneUsuario =
-async (
-    req,
-    res,
-    next
-) => {
+    async (
+        req,
+        res,
+        next
+    ) => {
 
-    try {
+        try {
 
-        /**
-         * Normaliza inclusive o telefone
-         * recebido pela URL.
-         */
-        const telefone =
-            normalizarTelefone(
-                req.params.telefone
-            );
-
-
-        const pedidos =
-            await connection(
-                'pedidos'
-            )
-
-                .select(
-
-                    'pedidos.id',
-
-                    'pedidos.nome_cliente',
-
-                    'pedidos.status',
-
-                    'pedidos.valor_total',
-
-                    'pedidos.metodo_pagamento_id',
-
-                    'pedidos.metodo_entrega',
-
-                    'pedidos.endereco_cliente',
-
-                    'pedidos.observacoes',
-
-                    'pedidos.criado_em',
-
-                    selecionarMarmitasJson(),
-
-                    selecionarProdutosJson()
-                )
-
-                .where(
-                    'pedidos.telefone_cliente',
-                    telefone
-                )
-
-                .whereNull(
-                    'pedidos.deletado_em'
-                )
-
-                .orderBy(
-                    'pedidos.criado_em',
-                    'desc'
+            /**
+             * Normaliza inclusive o telefone
+             * recebido pela URL.
+             */
+            const telefone =
+                normalizarTelefone(
+                    req.params.telefone
                 );
 
 
-        if (
-            pedidos.length ===
-            0
-        ) {
+            const pedidos =
+                await connection(
+                    'pedidos'
+                )
+
+                    .select(
+
+                        'pedidos.id',
+
+                        'pedidos.nome_cliente',
+
+                        'pedidos.status',
+
+                        'pedidos.valor_total',
+
+                        'pedidos.metodo_pagamento_id',
+
+                        'pedidos.metodo_entrega',
+
+                        'pedidos.endereco_cliente',
+
+                        'pedidos.observacoes',
+
+                        'pedidos.criado_em',
+
+                        selecionarMarmitasJson(),
+
+                        selecionarProdutosJson()
+                    )
+
+                    .where(
+                        'pedidos.telefone_cliente',
+                        telefone
+                    )
+
+                    .whereNull(
+                        'pedidos.deletado_em'
+                    )
+
+                    .orderBy(
+                        'pedidos.criado_em',
+                        'desc'
+                    );
+
+
+            if (
+                pedidos.length ===
+                0
+            ) {
+
+                return res
+                    .status(404)
+                    .json({
+
+                        status:
+                            'error',
+
+                        message:
+                            'Nenhum pedido encontrado para este número de telefone.'
+                    });
+            }
+
 
             return res
-                .status(404)
+                .status(200)
                 .json({
 
                     status:
-                        'error',
+                        'success',
 
-                    message:
-                        'Nenhum pedido encontrado para este número de telefone.'
+                    results:
+                        pedidos.length,
+
+                    data:
+                        pedidos
                 });
+
+
+        } catch (error) {
+
+            next(error);
         }
-
-
-        return res
-            .status(200)
-            .json({
-
-                status:
-                    'success',
-
-                results:
-                    pedidos.length,
-
-                data:
-                    pedidos
-            });
-
-
-    } catch (error) {
-
-        next(error);
-    }
-};
+    };
 
 
 /**

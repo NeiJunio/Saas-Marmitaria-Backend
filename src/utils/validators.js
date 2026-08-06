@@ -22,36 +22,28 @@ export function isValidCPF(cpf) {
 
 export function isValidCNPJ(cnpj) {
     if (!cnpj) return false;
-    const cleanCNPJ = String(cnpj).replace(/[^\d]/g, '');
     
-    if (cleanCNPJ.length !== 14 || /^(\d)\1+$/.test(cleanCNPJ)) return false;
+    // Limpa a string aceitando letras e números e transforma em maiúsculo
+    const cleanCNPJ = String(cnpj).replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
     
-    let tamanho = cleanCNPJ.length - 2;
-    let numeros = cleanCNPJ.substring(0, tamanho);
-    let digitos = cleanCNPJ.substring(tamanho);
-    let soma = 0;
-    let pos = tamanho - 7;
+    if (cleanCNPJ.length !== 14) return false;
     
-    for (let i = tamanho; i >= 1; i--) {
-        soma += numeros.charAt(tamanho - i) * pos--;
-        if (pos < 2) pos = 9;
-    }
-    
-    let resultado = soma % 11 < 2 ? 0 : 11 - soma % 11;
-    if (resultado != digitos.charAt(0)) return false;
-    
-    tamanho = tamanho + 1;
-    numeros = cleanCNPJ.substring(0, tamanho);
-    soma = 0;
-    pos = tamanho - 7;
-    
-    for (let i = tamanho; i >= 1; i--) {
-        soma += numeros.charAt(tamanho - i) * pos--;
-        if (pos < 2) pos = 9;
-    }
-    
-    resultado = soma % 11 < 2 ? 0 : 11 - soma % 11;
-    if (resultado != digitos.charAt(1)) return false;
-    
-    return true;
+    // Lógica do CNPJ Alfanumérico (ASCII - 48)
+    const calcDigit = (cnpjBase, pesoInicial) => {
+        let soma = 0;
+        let peso = pesoInicial;
+        for (let i = 0; i < cnpjBase.length; i++) {
+            const charCode = cnpjBase.charCodeAt(i) - 48;
+            soma += charCode * peso;
+            peso = peso === 2 ? 9 : peso - 1;
+        }
+        const resto = soma % 11;
+        return resto < 2 ? 0 : 11 - resto;
+    };
+
+    const base = cleanCNPJ.substring(0, 12);
+    const digito1 = calcDigit(base, 5);
+    const digito2 = calcDigit(base + String(digito1), 6);
+
+    return cleanCNPJ === (base + digito1 + digito2);
 }

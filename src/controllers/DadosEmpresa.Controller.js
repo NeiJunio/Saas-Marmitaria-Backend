@@ -79,11 +79,13 @@ export const salvarDadosEmpresa = async (req, res, next) => {
     const dados = req.body;
     const usuarioId = req.usuario?.id || null; 
     
-    if (!dados.cnpj || !isValidCNPJ(dados.cnpj)) {
-        return res.status(400).json({
-            status: 'error',
-            message: 'O CNPJ informado é inválido ou está em branco.'
-        });
+    if (dados.cnpj && dados.cnpj.trim() !== "") {
+        if (!isValidCNPJ(dados.cnpj)) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'O CNPJ informado é inválido.'
+            });
+        }
     }
 
     if (dados.cpf_proprietario && dados.cpf_proprietario.trim() !== "") {
