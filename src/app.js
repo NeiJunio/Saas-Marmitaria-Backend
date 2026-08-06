@@ -16,6 +16,7 @@ import UsuariosRoutes from './routes/Users.Routes.js'
 import RelatoriosRoutes from './routes/Relatorios.Routes.js'
 import KeepAliveRoutes from './routes/KeepAlive.Routes.js'
 import DadosEmpresaRoutes from './routes/DadosEmpresa.Routes.js'
+import QzRoutes from './routes/Qz.Routes.js'
 
 // Novos módulos de produtos.
 import CategoriasProdutosRoutes from './routes/CategoriaProduto.Routes.js';
@@ -88,6 +89,8 @@ app.use('/categorias-produtos', CategoriasProdutosRoutes);
 app.use('/produtos', ProdutosRoutes);
 app.use('/keep-alive', KeepAliveRoutes);
 app.use('/configuracoes', DadosEmpresaRoutes);
+app.use('/qz', QzRoutes);
+
 
 
 app.use(errorHandler)
