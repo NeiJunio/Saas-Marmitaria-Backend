@@ -91,11 +91,24 @@ export const listarAlimentosAdmin = async (req, res, next) => {
         const countQuery = await query.clone().clearSelect().count('a.id AS total').first();
         const { total } = countQuery || { total: 0 };
 
-        // Evita ambiguidade na ordenação adicionando o prefixo da tabela
-        const sortColumn = sort === 'nome' ? 'a.nome' : `a.${sort}`;
+        // 🚀 SOLUÇÃO: Dicionário que mapeia o "sort" do frontend para a tabela correta do banco
+        const colunasOrdenacaoValidas = {
+            id: 'a.id',
+            nome: 'a.nome',
+            categoria_id: 'a.categoria_id',
+            disponivel_hoje: 'a.disponivel_hoje',
+            deletado_em: 'a.deletado_em',
+            categoria_nome: 'c.nome' // Aqui é o "pulo do gato": aponta para a tabela "c"
+        };
+
+        // Se o frontend mandar algo bizarro, cai no padrão (a.id)
+        const sortColumn = colunasOrdenacaoValidas[sort] || 'a.id';
+
+        // Garante que o order é ASC ou DESC
+        const direcao = String(order).toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
 
         const alimentos = await query
-            .orderBy(sortColumn, order)
+            .orderBy(sortColumn, direcao)
             .limit(limit)
             .offset(offset);
 
@@ -136,12 +149,12 @@ export const criarAlimento = async (req, res, next) => {
     const {
         nome,
         descricao,
-        categoria_alimento_id
+        categoria_id
     } = req.body
 
     const usuario_id = req.usuario.id
 
-    if (!nome || !categoria_alimento_id) {
+    if (!nome || !categoria_id) {
         return next(lancarErro('Nome e categoria do alimento são obrigatórios', 400))
     }
 
@@ -151,7 +164,7 @@ export const criarAlimento = async (req, res, next) => {
 
         const categoriaAlimento = await connection('categorias_alimentos')
             .transacting(trx)
-            .where('id', categoria_alimento_id)
+            .where('id', categoria_id)
             .whereNull('deletado_em')
             .forUpdate()
             .first()
@@ -166,7 +179,7 @@ export const criarAlimento = async (req, res, next) => {
             .insert({
                 nome: nome.trim().toUpperCase(),
                 descricao: descricao,
-                categoria_id: categoria_alimento_id
+                categoria_id: categoria_id
             })
             .returning('*')
 
@@ -428,9 +441,9 @@ export const alternarDisponibilidade = async (req, res, next) => {
             return res.status(404).json({ message: 'Alimento não encontrado.' });
         }
 
-        return res.status(200).json({ 
-            status: 'success', 
-            message: `Disponibilidade do alimento ${id} alterada para ${disponivel_hoje}` 
+        return res.status(200).json({
+            status: 'success',
+            message: `Disponibilidade do alimento ${id} alterada para ${disponivel_hoje}`
         });
     } catch (error) {
         next(error);
@@ -447,11 +460,11 @@ export const zerarCardapio = async (req, res, next) => {
             .whereNull('deletado_em')
             .update({ disponivel_hoje: false });
 
-        await connection('status_loja') 
+        await connection('status_loja')
             .transacting(trx)
             // .where('id', req.usuario.tenant_id)
             .update({ esta_aberta: false });
-        
+
         // Salva no log de auditoria quem apertou o botão de fechar a loja
         await connection('logs')
             .transacting(trx)
@@ -466,10 +479,10 @@ export const zerarCardapio = async (req, res, next) => {
             });
 
         await trx.commit();
-        
-        return res.status(200).json({ 
-            status: 'success', 
-            message: 'Cardápio zerado com sucesso. Expediente encerrado!' 
+
+        return res.status(200).json({
+            status: 'success',
+            message: 'Cardápio zerado com sucesso. Expediente encerrado!'
         });
     } catch (error) {
         if (trx) await trx.rollback();
@@ -491,8 +504,8 @@ export const listarCardapioParaCliente = async (req, res, next) => {
             ])
             .where('a.disponivel_hoje', true)
             .whereNull('a.deletado_em')
-            .where('a.disponivel_hoje', true) 
-            .orderBy('c.id', 'ASC') 
+            .where('a.disponivel_hoje', true)
+            .orderBy('c.id', 'ASC')
             .orderBy('a.nome', 'ASC');
 
         return res.status(200).json({
