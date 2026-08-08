@@ -105,12 +105,15 @@ export const criarPedido = async (req, res, next) => {
 
         await trx.commit();
 
-        if (global.io) {
-            global.io.to("pedidos").emit("novo_pedido_recebido", {
-                id: pedido.id,
-                nome_cliente,
-                status: "Pendente"
-            });
+        // O pedido já está confirmado no banco. A falha do Socket não pode invalidar a criação nem induzir o cliente a reenviar o pedido.
+        try {
+            const pedidoCompleto = await buscarPedidoCompletoPorId(pedido.id);
+
+            if (global.io && pedidoCompleto) {
+                global.io.to("pedidos").emit("novo_pedido_recebido", pedidoCompleto);
+            }
+        } catch (socketError) {
+            console.error(`Erro ao emitir o pedido #${pedido.id} pelo Socket.IO:`, socketError);
         }
 
         return res.status(201).json({
