@@ -1,0 +1,134 @@
+
+name: Database Automático Backup
+
+on:
+  schedule:
+    # 04:17 BRT = 07:17 UTC
+    - cron: "17 7 * * *"
+
+  # Permite execução manual pelo GitHub
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # ---------------------------------------------
+      # 1. Preparar ambiente
+      # ---------------------------------------------
+      - name: Preparar ambiente
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      # ---------------------------------------------
+      # 2. Gerar backup PostgreSQL
+      # ---------------------------------------------
+      - name: Gerar backup PostgreSQL
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -e
+
+          TIMESTAMP=$(date -u +"%Y-%m-%d_%H-%M-%S")
+          DATE_PATH=$(date -u +"%Y/%m")
+
+          mkdir -p backup
+
+          echo "Iniciando backup do PostgreSQL..."
+
+          pg_dump "$DATABASE_URL" \
+            --format=custom \
+            --file="backup/marmitaria-${TIMESTAMP}.dump"
+
+          echo "Backup criado com sucesso."
+
+          echo "Compactando backup..."
+
+          gzip "backup/marmitaria-${TIMESTAMP}.dump"
+
+          echo "Gerando hash SHA-256..."
+
+          sha256sum \
+            "backup/marmitaria-${TIMESTAMP}.dump.gz" \
+            > "backup/marmitaria-${TIMESTAMP}.dump.gz.sha256"
+
+          echo "BACKUP_FILE=backup/marmitaria-${TIMESTAMP}.dump.gz" >> "$GITHUB_ENV"
+          echo "HASH_FILE=backup/marmitaria-${TIMESTAMP}.dump.gz.sha256" >> "$GITHUB_ENV"
+          echo "DATE_PATH=$DATE_PATH" >> "$GITHUB_ENV"
+
+          echo "Backup preparado com sucesso."
+
+      # ---------------------------------------------
+      # 3. Configurar credenciais R2
+      # ---------------------------------------------
+      - name: Configurar credenciais do Cloudflare R2
+        if: success()
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.R2_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          aws-region: auto
+
+      # ---------------------------------------------
+      # 4. Enviar backup para R2
+      # ---------------------------------------------
+      - name: Enviar backup para Cloudflare R2
+        if: success()
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+        run: |
+          set -e
+
+          R2_ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+
+          echo "Enviando backup..."
+
+          aws s3 cp \
+            "$BACKUP_FILE" \
+            "s3://${R2_BUCKET_NAME}/backups/postgres/${DATE_PATH}/" \
+            --endpoint-url "$R2_ENDPOINT"
+
+          echo "Enviando hash SHA-256..."
+
+          aws s3 cp \
+            "$HASH_FILE" \
+            "s3://${R2_BUCKET_NAME}/backups/postgres/${DATE_PATH}/" \
+            --endpoint-url "$R2_ENDPOINT"
+
+          echo "Upload concluído com sucesso."
+
+      # ---------------------------------------------
+      # 5. Healthchecks - sucesso
+      # ---------------------------------------------
+      - name: Notificar sucesso
+        if: success()
+        env:
+          HEALTHCHECKS_URL: ${{ secrets.HEALTHCHECKS_URL }}
+        run: |
+          curl --fail --silent --show-error \
+            "$HEALTHCHECKS_URL"
+
+      # ---------------------------------------------
+      # 6. Healthchecks - falha
+      # ---------------------------------------------
+      - name: Notificar falha
+        if: failure()
+        env:
+          HEALTHCHECKS_URL: ${{ secrets.HEALTHCHECKS_URL }}
+        run: |
+          curl --fail --silent --show-error \
+            "${HEALTHCHECKS_URL}/fail"
+
+          exit 1
+
+      # ---------------------------------------------
+      # 7. Limpar arquivos temporários
+      # ---------------------------------------------
+      - name: Limpar arquivos locais
+        if: always()
+        run: |
+          rm -rf backup
