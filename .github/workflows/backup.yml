@@ -1,4 +1,3 @@
-
 name: Database Automático Backup
 
 on:
@@ -16,12 +15,26 @@ jobs:
     steps:
 
       # ---------------------------------------------
-      # 1. Preparar ambiente
+      # 1. Preparar ambiente - PostgreSQL 17
       # ---------------------------------------------
       - name: Preparar ambiente
         run: |
           sudo apt-get update
-          sudo apt-get install -y postgresql-client
+          sudo apt-get install -y ca-certificates curl gnupg
+
+          sudo install -d /usr/share/postgresql-common/pgdg
+
+          sudo curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            --fail https://www.postgresql.org/media/keys/ACCC4CF8.asc
+
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt noble-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list
+
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-17
+
+          echo "Versão do pg_dump:"
+          pg_dump --version
 
       # ---------------------------------------------
       # 2. Gerar backup PostgreSQL
@@ -37,26 +50,28 @@ jobs:
 
           mkdir -p backup
 
-          echo "Iniciando backup do PostgreSQL..."
+          echo "Iniciando backup do PostgreSQL com pg_dump 17..."
 
-          pg_dump "$DATABASE_URL" \
+          # Arquivo inicial temporário limpo apenas como "backup"
+          /usr/lib/postgresql/17/bin/pg_dump "$DATABASE_URL" \
             --format=custom \
-            --file="backup/marmitaria-${TIMESTAMP}.dump"
+            --file="backup/backup-${TIMESTAMP}.dump"
 
           echo "Backup criado com sucesso."
 
-          echo "Compactando backup..."
+          echo "Compactando e identificando o arquivo..."
 
-          gzip "backup/marmitaria-${TIMESTAMP}.dump"
+          # Renomeia e compacta para incluir "la-casa-da-marmita" apenas no arquivo final compactado
+          gzip -c "backup/backup-${TIMESTAMP}.dump" > "backup/backup-la-casa-da-marmita-${TIMESTAMP}.dump.gz"
 
           echo "Gerando hash SHA-256..."
 
           sha256sum \
-            "backup/marmitaria-${TIMESTAMP}.dump.gz" \
-            > "backup/marmitaria-${TIMESTAMP}.dump.gz.sha256"
+            "backup/backup-la-casa-da-marmita-${TIMESTAMP}.dump.gz" \
+            > "backup/backup-la-casa-da-marmita-${TIMESTAMP}.dump.gz.sha256"
 
-          echo "BACKUP_FILE=backup/marmitaria-${TIMESTAMP}.dump.gz" >> "$GITHUB_ENV"
-          echo "HASH_FILE=backup/marmitaria-${TIMESTAMP}.dump.gz.sha256" >> "$GITHUB_ENV"
+          echo "BACKUP_FILE=backup/backup-la-casa-da-marmita-${TIMESTAMP}.dump.gz" >> "$GITHUB_ENV"
+          echo "HASH_FILE=backup/backup-la-casa-da-marmita-${TIMESTAMP}.dump.gz.sha256" >> "$GITHUB_ENV"
           echo "DATE_PATH=$DATE_PATH" >> "$GITHUB_ENV"
 
           echo "Backup preparado com sucesso."
