@@ -59,6 +59,61 @@ export const listarAlimentos = async (req, res, next) => {
 
 }
 
+// export const listarAlimentosAdmin = async (req, res, next) => {
+//     try {
+//         const {
+//             page = 1, limit = 10, search = '',
+//             sort = 'id', order = 'ASC', excluidos = 'mixed'
+//         } = req.query;
+
+//         const offset = (page - 1) * limit;
+
+//         const query = connection('alimentos as a')
+//             .leftJoin('categorias_alimentos as c', 'a.categoria_id', 'c.id')
+//             .select([
+//                 'a.id',
+//                 'a.nome',
+//                 'a.categoria_id',
+//                 'a.disponivel_hoje',
+//                 'a.deletado_em',
+//                 'c.nome as categoria_nome'
+//             ]);
+
+//         if (excluidos === 'false') query.whereNull('a.deletado_em');
+//         if (excluidos === 'true') query.whereNotNull('a.deletado_em');
+
+//         if (search) {
+//             query.andWhere(function () {
+//                 this.where('a.nome', 'ilike', `%${search}%`);
+//             });
+//         }
+
+//         const countQuery = await query.clone().clearSelect().count('a.id AS total').first();
+//         const { total } = countQuery || { total: 0 };
+
+//         // Evita ambiguidade na ordenação adicionando o prefixo da tabela
+//         const sortColumn = sort === 'nome' ? 'a.nome' : `a.${sort}`;
+
+//         const alimentos = await query
+//             .orderBy(sortColumn, order)
+//             .limit(limit)
+//             .offset(offset);
+
+//         return res.json({
+//             status: 'success',
+//             data: alimentos,
+//             pagination: {
+//                 total: parseInt(total || 0),
+//                 page: parseInt(page),
+//                 last_page: Math.ceil((total || 0) / limit)
+//             }
+//         });
+
+//     } catch (error) {
+//         next(error);
+//     }
+// };
+
 export const listarAlimentosAdmin = async (req, res, next) => {
     try {
         const {
@@ -91,11 +146,24 @@ export const listarAlimentosAdmin = async (req, res, next) => {
         const countQuery = await query.clone().clearSelect().count('a.id AS total').first();
         const { total } = countQuery || { total: 0 };
 
-        // Evita ambiguidade na ordenação adicionando o prefixo da tabela
-        const sortColumn = sort === 'nome' ? 'a.nome' : `a.${sort}`;
+        // 🚀 SOLUÇÃO: Dicionário que mapeia o "sort" do frontend para a tabela correta do banco
+        const colunasOrdenacaoValidas = {
+            id: 'a.id',
+            nome: 'a.nome',
+            categoria_id: 'a.categoria_id',
+            disponivel_hoje: 'a.disponivel_hoje',
+            deletado_em: 'a.deletado_em',
+            categoria_nome: 'c.nome' // Aqui é o "pulo do gato": aponta para a tabela "c"
+        };
+
+        // Se o frontend mandar algo bizarro, cai no padrão (a.id)
+        const sortColumn = colunasOrdenacaoValidas[sort] || 'a.id';
+
+        // Garante que o order é ASC ou DESC
+        const direcao = String(order).toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
 
         const alimentos = await query
-            .orderBy(sortColumn, order)
+            .orderBy(sortColumn, direcao)
             .limit(limit)
             .offset(offset);
 
