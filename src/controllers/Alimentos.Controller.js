@@ -59,6 +59,61 @@ export const listarAlimentos = async (req, res, next) => {
 
 }
 
+// export const listarAlimentosAdmin = async (req, res, next) => {
+//     try {
+//         const {
+//             page = 1, limit = 10, search = '',
+//             sort = 'id', order = 'ASC', excluidos = 'mixed'
+//         } = req.query;
+
+//         const offset = (page - 1) * limit;
+
+//         const query = connection('alimentos as a')
+//             .leftJoin('categorias_alimentos as c', 'a.categoria_id', 'c.id')
+//             .select([
+//                 'a.id',
+//                 'a.nome',
+//                 'a.categoria_id',
+//                 'a.disponivel_hoje',
+//                 'a.deletado_em',
+//                 'c.nome as categoria_nome'
+//             ]);
+
+//         if (excluidos === 'false') query.whereNull('a.deletado_em');
+//         if (excluidos === 'true') query.whereNotNull('a.deletado_em');
+
+//         if (search) {
+//             query.andWhere(function () {
+//                 this.where('a.nome', 'ilike', `%${search}%`);
+//             });
+//         }
+
+//         const countQuery = await query.clone().clearSelect().count('a.id AS total').first();
+//         const { total } = countQuery || { total: 0 };
+
+//         // Evita ambiguidade na ordenação adicionando o prefixo da tabela
+//         const sortColumn = sort === 'nome' ? 'a.nome' : `a.${sort}`;
+
+//         const alimentos = await query
+//             .orderBy(sortColumn, order)
+//             .limit(limit)
+//             .offset(offset);
+
+//         return res.json({
+//             status: 'success',
+//             data: alimentos,
+//             pagination: {
+//                 total: parseInt(total || 0),
+//                 page: parseInt(page),
+//                 last_page: Math.ceil((total || 0) / limit)
+//             }
+//         });
+
+//     } catch (error) {
+//         next(error);
+//     }
+// };
+
 export const listarAlimentosAdmin = async (req, res, next) => {
     try {
         const {
