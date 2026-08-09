@@ -29,14 +29,57 @@
 //     }
 // };
 
-import crypto from "crypto";
-import fs from "fs";
-import path from "path";
+/* ------------------------------------ */
 
-const PRIVATE_KEY = fs.readFileSync(
-    path.resolve("private-key.pem"),
-    "utf8"
-);
+// import crypto from "crypto";
+// import fs from "fs";
+// import path from "path";
+
+// const PRIVATE_KEY = fs.readFileSync(
+//     path.resolve("private-key.pem"),
+//     "utf8"
+// );
+
+// export const assinarRequisicaoQZ = (req, res) => {
+//     try {
+//         const { request } = req.body;
+
+//         console.log("Request:", request);
+
+//         const signer = crypto.createSign("RSA-SHA512");
+
+//         signer.update(request);
+//         signer.end();
+
+//         const assinatura = signer.sign(PRIVATE_KEY, "base64");
+
+//         console.log("Assinatura gerada:", assinatura.substring(0, 50) + "...");
+
+//         res.send(assinatura);
+
+//     } catch (e) {
+//         console.error(e);
+//         res.status(500).send(e.message);
+//     }
+// };
+
+/* ------------------------------------ */
+
+import crypto from "crypto";
+// Não precisamos mais do 'fs' e do 'path' aqui
+
+// Função auxiliar para resgatar e formatar a chave
+const getPrivateKey = () => {
+    const rawKey = process.env.QZ_PRIVATE_KEY;
+    
+    if (!rawKey) {
+        throw new Error("A variável de ambiente QZ_PRIVATE_KEY não está definida.");
+    }
+
+    // Procura pela string literal "\n" (escapada com duplo '\') 
+    // e substitui por uma quebra de linha real '\n'
+    return rawKey.replace(/\\n/g, '\n');
+};
 
 export const assinarRequisicaoQZ = (req, res) => {
     try {
@@ -44,12 +87,16 @@ export const assinarRequisicaoQZ = (req, res) => {
 
         console.log("Request:", request);
 
+        // Pega a chave já formatada
+        const privateKey = getPrivateKey();
+
         const signer = crypto.createSign("RSA-SHA512");
 
         signer.update(request);
         signer.end();
 
-        const assinatura = signer.sign(PRIVATE_KEY, "base64");
+        // Assina usando a chave que veio do .env
+        const assinatura = signer.sign(privateKey, "base64");
 
         console.log("Assinatura gerada:", assinatura.substring(0, 50) + "...");
 
