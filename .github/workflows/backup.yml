@@ -77,22 +77,15 @@ jobs:
           echo "Backup preparado com sucesso."
 
       # ---------------------------------------------
-      # 3. Configurar credenciais R2
-      # ---------------------------------------------
-      - name: Configurar credenciais do Cloudflare R2
-        if: success()
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.R2_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          aws-region: auto
-
-      # ---------------------------------------------
-      # 4. Enviar backup para R2
+      # 3. Enviar backup para Cloudflare R2
+      # (Sem usar a Action da AWS, passando as envs direto)
       # ---------------------------------------------
       - name: Enviar backup para Cloudflare R2
         if: success()
         env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
           R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
         run: |
@@ -117,7 +110,7 @@ jobs:
           echo "Upload concluído com sucesso."
 
       # ---------------------------------------------
-      # 5. Healthchecks - sucesso
+      # 4. Healthchecks - sucesso
       # ---------------------------------------------
       - name: Notificar sucesso
         if: success()
@@ -126,9 +119,8 @@ jobs:
         run: |
           curl --fail --silent --show-error \
             "$HEALTHCHECKS_URL"
-
       # ---------------------------------------------
-      # 6. Healthchecks - falha
+      # 5. Healthchecks - falha
       # ---------------------------------------------
       - name: Notificar falha
         if: failure()
@@ -138,10 +130,8 @@ jobs:
           curl --fail --silent --show-error \
             "${HEALTHCHECKS_URL}/fail"
 
-          exit 1
-
       # ---------------------------------------------
-      # 7. Limpar arquivos temporários
+      # 6. Limpar arquivos temporários
       # ---------------------------------------------
       - name: Limpar arquivos locais
         if: always()
