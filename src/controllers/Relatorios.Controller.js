@@ -77,9 +77,4 @@ export const gerarRelatorio = async (req, res, next) => {
     } catch (error) {
         next(error);
     }
-
-
-
-
 }
-

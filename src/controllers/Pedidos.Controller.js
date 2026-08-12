@@ -386,6 +386,63 @@ export const alterarStatusPedido = async (req, res, next) => {
     }
 };
 
+// export const listarPedidosAdmin = async (req, res, next) => {
+//     try {
+//         const { page = 1, limit = 10, search = "", status = "todos" } = req.query;
+
+//         const pagina = Math.max(Number.parseInt(page, 10) || 1, 1);
+//         const porPagina = Math.min(Math.max(Number.parseInt(limit, 10) || 10, 1), 100);
+//         const offset = (pagina - 1) * porPagina;
+
+//         const baseQuery = connection("pedidos").whereNull("pedidos.deletado_em");
+
+//         if (String(search).trim()) {
+//             const termo = String(search).trim();
+//             baseQuery.where(function () {
+//                 this.where("nome_cliente", "ILIKE", `%${termo}%`)
+//                     .orWhere("telefone_cliente", "ILIKE", `%${termo}%`);
+
+//                 if (/^\d+$/.test(termo)) {
+//                     this.orWhere("pedidos.id", Number(termo));
+//                 }
+//             });
+//         }
+
+//         if (status !== "todos") {
+//             baseQuery.where("pedidos.status", status);
+//         }
+
+//         const [{ total }] = await baseQuery.clone().count("pedidos.id as total");
+
+//         const pedidos = await baseQuery.clone()
+//             .leftJoin("metodos_pagamento", "pedidos.metodo_pagamento_id", "=", "metodos_pagamento.id")
+//             .select(
+//                 "pedidos.*",
+//                 "metodos_pagamento.nome as metodo_pagamento_nome",
+//                 selecionarMarmitasJson(),
+//                 selecionarProdutosJson()
+//             )
+//             .orderBy("pedidos.criado_em", "desc")
+//             .limit(porPagina)
+//             .offset(offset);
+
+//         const totalRegistros = Number(total || 0);
+
+//         return res.status(200).json({
+//             status: "success",
+//             pagination: {
+//                 total: totalRegistros,
+//                 page: pagina,
+//                 per_page: porPagina,
+//                 totalPages: Math.max(Math.ceil(totalRegistros / porPagina), 1)
+//             },
+//             data: pedidos
+//         });
+//     } catch (error) {
+//         next(error);
+//     }
+// };
+
 export const listarPedidosAdmin = async (req, res, next) => {
     try {
         const { page = 1, limit = 10, search = "", status = "todos" } = req.query;
@@ -398,12 +455,17 @@ export const listarPedidosAdmin = async (req, res, next) => {
 
         if (String(search).trim()) {
             const termo = String(search).trim();
+
             baseQuery.where(function () {
                 this.where("nome_cliente", "ILIKE", `%${termo}%`)
                     .orWhere("telefone_cliente", "ILIKE", `%${termo}%`);
 
                 if (/^\d+$/.test(termo)) {
-                    this.orWhere("pedidos.id", Number(termo));
+                    const pedidoId = Number(termo);
+
+                    if (Number.isInteger(pedidoId) && pedidoId >= 1 && pedidoId <= 2147483647) {
+                        this.orWhere("pedidos.id", pedidoId);
+                    }
                 }
             });
         }

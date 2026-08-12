@@ -87,43 +87,74 @@ export const listarCategoriaDeAlimentoPorId = async (req, res, next) => {
 }
 
 export const criarCategoriaDeAlimento = async (req, res, next) => {
+    if (!req.body || Object.keys(req.body).length === 0) {
+        return next(lancarErro('O corpo da requisição não pode estar vazio.', 400));
+    }
+
+    const { nome, limite_escolhas } = req.body;
+
+    if (!nome || String(nome).trim() === '') {
+        return next(lancarErro('O nome da categoria é obrigatório.', 400));
+    }
+
+    if (limite_escolhas === undefined || limite_escolhas === null || String(limite_escolhas).trim() === '' || isNaN(limite_escolhas) || Number(limite_escolhas) < 0) {
+        return next(lancarErro('O limite de escolhas deve ser um número válido igual ou maior que zero.', 400));
+    }
+
+    const nomeFormatado = String(nome).trim().toUpperCase();
+    const limiteFormatado = Number(limite_escolhas);
+    const trx = await connection.transaction();
+
     try {
-
-        const { nome, limite_escolhas } = req.body;
-
-        if (!nome || !limite_escolhas) {
-            lancarErro('Preencha todos os campos corretamente');
-        }
-
         const categoriaExiste = await connection('categorias_alimentos')
-            .where('nome', nome.toUpperCase())
+            .transacting(trx)
+            .whereRaw('UPPER(TRIM(nome)) = ?', [nomeFormatado])
             .whereNull('deletado_em')
-            .first()
+            .first();
 
         if (categoriaExiste) {
-            lancarErro('Essa categoria de alimento já está cadastrada', 400);
+            await trx.rollback();
+            return next(lancarErro(`Já existe uma categoria de alimento cadastrada com o nome "${nomeFormatado}".`, 409));
         }
 
         const [novaCategoriaDeAlimento] = await connection('categorias_alimentos')
+            .transacting(trx)
             .insert({
-                nome: nome.toUpperCase(),
-                limite_escolhas: limite_escolhas,
+                nome: nomeFormatado,
+                limite_escolhas: limiteFormatado
             })
-            .returning(['id', 'nome'])
+            .returning('*');
 
-        return res.status(200).json({
+        await connection('logs')
+            .transacting(trx)
+            .insert({
+                tipo: 'ACAO',
+                usuario_id: req.usuario?.id || null,
+                metodo: req.method,
+                endpoint: req.originalUrl,
+                acao: 'CATEGORIA_ALIMENTO.CRIAR',
+                descricao: `Criou a categoria de alimentos #${novaCategoriaDeAlimento.id}: ${novaCategoriaDeAlimento.nome}`,
+                payload: JSON.stringify(novaCategoriaDeAlimento)
+            });
+
+        await trx.commit();
+
+        return res.status(201).json({
             status: 'success',
             data: novaCategoriaDeAlimento
-        })
-
+        });
     } catch (error) {
-        next(error);
+        await trx.rollback();
+
+        if (error.code === '23505') {
+            return next(lancarErro(`Já existe uma categoria de alimento cadastrada com o nome "${nomeFormatado}".`, 409));
+        }
+
+        return next(error);
     }
-}
+};
 
 export const editarCategoriaDeAlimento = async (req, res, next) => {
-
-
     if (!req.body || Object.keys(req.body).length === 0) {
         return next(lancarErro('O corpo da requisição não pode estar vazio.', 400));
     }
@@ -132,14 +163,12 @@ export const editarCategoriaDeAlimento = async (req, res, next) => {
     const { nome, limite_escolhas, ativo } = req.body;
     const usuario_id = req.usuario.id;
 
-    if (nome !== undefined && nome.trim().length === 0) {
+    if (nome !== undefined && String(nome).trim().length === 0) {
         return next(lancarErro('O nome da categoria não pode ser uma string vazia.', 400));
     }
 
-    if (limite_escolhas !== undefined) {
-        if (String(limite_escolhas).trim() === "" || isNaN(limite_escolhas) || limite_escolhas < 0) {
-            return next(lancarErro('O limite de escolhas deve ser um número válido igual ou maior que zero.', 400));
-        }
+    if (limite_escolhas !== undefined && (String(limite_escolhas).trim() === '' || isNaN(limite_escolhas) || Number(limite_escolhas) < 0)) {
+        return next(lancarErro('O limite de escolhas deve ser um número válido igual ou maior que zero.', 400));
     }
 
     if (ativo !== undefined && typeof ativo !== 'boolean') {
@@ -149,87 +178,80 @@ export const editarCategoriaDeAlimento = async (req, res, next) => {
     const trx = await connection.transaction();
 
     try {
-
         const categoriaAtual = await connection('categorias_alimentos')
             .transacting(trx)
             .where('id', id)
             .whereNull('deletado_em')
             .forUpdate()
-            .first()
+            .first();
 
         if (!categoriaAtual) {
             await trx.rollback();
-            return next(lancarErro('Categoria de alimentos não encontrada', 404));
+            return next(lancarErro('Categoria de alimentos não encontrada.', 404));
         }
 
         const camposParaAtualizar = {};
 
-        // Tratativa do campo Nome
-        if (nome !== undefined && nome.toUpperCase() !== categoriaAtual.nome) {
-            const jaExiste = await connection('categorias_alimentos')
-                .transacting(trx)
-                .where('nome', nome.toUpperCase())
-                .whereNot('id', id)
-                .whereNull('deletado_em')
-                .first()
+        if (nome !== undefined) {
+            const nomeFormatado = String(nome).trim().toUpperCase();
 
-            if (jaExiste) {
-                await trx.rollback();
-                return next(lancarErro('Este nome já está em uso.', 400));
+            if (nomeFormatado !== categoriaAtual.nome) {
+                const jaExiste = await connection('categorias_alimentos')
+                    .transacting(trx)
+                    .whereRaw('UPPER(TRIM(nome)) = ?', [nomeFormatado])
+                    .whereNot('id', id)
+                    .whereNull('deletado_em')
+                    .first();
+
+                if (jaExiste) {
+                    await trx.rollback();
+                    return next(lancarErro(`Já existe uma categoria de alimento cadastrada com o nome "${nomeFormatado}".`, 409));
+                }
+
+                camposParaAtualizar.nome = nomeFormatado;
             }
-
-            camposParaAtualizar.nome = nome.toUpperCase();
         }
 
-        // Tratamento do campo Limite
         if (limite_escolhas !== undefined && Number(limite_escolhas) !== categoriaAtual.limite_escolhas) {
             camposParaAtualizar.limite_escolhas = Number(limite_escolhas);
         }
 
-        // Tratativa do campo Ativo
         if (ativo !== undefined && ativo !== categoriaAtual.ativo) {
             camposParaAtualizar.ativo = ativo;
         }
 
         if (Object.keys(camposParaAtualizar).length === 0) {
             await trx.rollback();
+
             return res.status(200).json({
                 status: 'success',
                 message: 'Nenhuma alteração necessária, os dados já são os mesmos.',
                 data: categoriaAtual
-            })
+            });
         }
 
-        // Atualizando campos
         const [categoriaAtualizada] = await connection('categorias_alimentos')
             .transacting(trx)
-            .update(camposParaAtualizar)
             .where('id', id)
-            .returning('*')
+            .update(camposParaAtualizar)
+            .returning('*');
 
-        // Log auditoria
         await connection('logs')
             .transacting(trx)
             .insert({
                 tipo: 'ACAO',
-                usuario_id: usuario_id,
+                usuario_id,
+                metodo: req.method,
+                endpoint: req.originalUrl,
                 acao: 'CATEGORIA_ALIMENTO.EDITAR',
                 descricao: `Alteração na categoria de alimentos #${id}`,
                 payload: JSON.stringify({
                     recurso_id: id,
                     campos_alterados: Object.keys(camposParaAtualizar),
-                    dados_antigos: {
-                        nome: categoriaAtual.nome,
-                        limite: categoriaAtual.limite_escolhas
-                    },
-                    dados_novos: camposParaAtualizar,
-                    contexto: {
-                        ip: req.ip,
-                        user_agent: req.headers['user-agent'],
-                        rota: req.originalUrl
-                    }
+                    dados_antigos: categoriaAtual,
+                    dados_novos: categoriaAtualizada
                 })
-            })
+            });
 
         await trx.commit();
 
@@ -237,17 +259,23 @@ export const editarCategoriaDeAlimento = async (req, res, next) => {
             status: 'success',
             data: categoriaAtualizada
         });
-
     } catch (error) {
+        await trx.rollback();
 
-        if (trx) {
-            await trx.rollback();
+        if (error.code === '23505') {
+            const nomeFormatado = nome ? String(nome).trim().toUpperCase() : '';
+
+            return next(lancarErro(
+                nomeFormatado
+                    ? `Já existe uma categoria de alimento cadastrada com o nome "${nomeFormatado}".`
+                    : 'Já existe outra categoria utilizando estes dados.',
+                409
+            ));
         }
 
-        next(error);
-
+        return next(error);
     }
-}
+};
 
 export const inativarCategoriaDeAlimento = async (req, res, next) => {
 

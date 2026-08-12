@@ -70,7 +70,6 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
     },
 }));
 
-
 app.use(limitadorGeral);
 app.use('/alimentos', AlimentosRoutes)
 app.use('/auth', AuthRoutes)
@@ -90,8 +89,6 @@ app.use('/produtos', ProdutosRoutes);
 app.use('/keep-alive', KeepAliveRoutes);
 app.use('/configuracoes', DadosEmpresaRoutes);
 app.use('/qz', QzRoutes);
-
-
 
 app.use(errorHandler)
 

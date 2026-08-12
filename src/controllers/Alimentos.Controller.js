@@ -196,74 +196,82 @@ export const buscarAlimentoPorId = async (req, res, next) => {
 }
 
 export const criarAlimento = async (req, res, next) => {
-
     if (!req.body || Object.keys(req.body).length === 0) {
         return next(lancarErro('O corpo da requisição não pode estar vazio.', 400));
     }
 
-    const {
-        nome,
-        descricao,
-        categoria_id
-    } = req.body
-
-    const usuario_id = req.usuario.id
+    const { nome, descricao, categoria_id } = req.body;
+    const usuario_id = req.usuario.id;
 
     if (!nome || !categoria_id) {
-        return next(lancarErro('Nome e categoria do alimento são obrigatórios', 400))
+        return next(lancarErro('Nome e categoria do alimento são obrigatórios', 400));
     }
 
-    const trx = await connection.transaction()
+    const nomeFormatado = nome.trim().toUpperCase();
+    const trx = await connection.transaction();
 
     try {
-
         const categoriaAlimento = await connection('categorias_alimentos')
             .transacting(trx)
             .where('id', categoria_id)
             .whereNull('deletado_em')
             .forUpdate()
-            .first()
+            .first();
 
         if (!categoriaAlimento) {
-            await trx.rollback()
-            return next(lancarErro('A categoria do alimento não existe ou foi removida', 400))
+            await trx.rollback();
+            return next(lancarErro('A categoria do alimento não existe ou foi removida', 400));
+        }
+
+        // Verifica se já existe outro alimento ativo com o mesmo nome.
+        const alimentoExistente = await connection('alimentos')
+            .transacting(trx)
+            .where('nome', nomeFormatado)
+            .whereNull('deletado_em')
+            .first();
+
+        if (alimentoExistente) {
+            await trx.rollback();
+            return next(lancarErro(`Já existe um alimento cadastrado com o nome "${nomeFormatado}".`, 409));
         }
 
         const [novoAlimento] = await connection('alimentos')
             .transacting(trx)
             .insert({
-                nome: nome.trim().toUpperCase(),
-                descricao: descricao,
-                categoria_id: categoria_id
+                nome: nomeFormatado,
+                descricao,
+                categoria_id
             })
-            .returning('*')
+            .returning('*');
 
-        // Logs de auditoria
+        // Registra a criação do alimento no histórico de auditoria.
         await connection('logs')
             .transacting(trx)
             .insert({
                 tipo: 'ACAO',
-                usuario_id: usuario_id,
+                usuario_id,
                 acao: 'ALIMENTO.CRIAR',
                 descricao: `Criou o alimento ${novoAlimento.nome} na categoria ${categoriaAlimento.nome}`,
                 payload: JSON.stringify(novoAlimento)
-            })
+            });
 
         await trx.commit();
+
         return res.status(201).json({
             status: 'success',
             data: novoAlimento
-        })
-
+        });
     } catch (error) {
-        if (trx) {
-            await trx.rollback()
+        await trx.rollback();
+
+        // PostgreSQL 23505 = violação de restrição UNIQUE.
+        if (error.code === '23505' && error.constraint === 'idx_nome_alimento_ativo') {
+            return next(lancarErro(`Já existe um alimento cadastrado com o nome "${nomeFormatado}".`, 409));
         }
 
-        next(error)
+        return next(error);
     }
-
-}
+};
 
 
 export const editarAlimento = async (req, res, next) => {
@@ -310,9 +318,8 @@ export const editarAlimento = async (req, res, next) => {
 
             if (jaExiste) {
                 await trx.rollback();
-                return next(lancarErro('Já existe um alimento com este nome', 400));
+                return next(lancarErro(`Já existe um alimento cadastrado com o nome "${nome.trim().toUpperCase()}".`, 409));
             }
-
             camposParaAtualizar.nome = nome.trim().toUpperCase();
 
         }
@@ -389,11 +396,15 @@ export const editarAlimento = async (req, res, next) => {
         });
 
     } catch (error) {
-        if (trx) {
-            await trx.rollback();
+        await trx.rollback();
+
+        // Proteção final caso duas alterações simultâneas tentem usar o mesmo nome.
+        if (error.code === '23505' && error.constraint === 'idx_nome_alimento_ativo') {
+            const nomeFormatado = nome?.trim().toUpperCase();
+            return next(lancarErro(`Já existe um alimento cadastrado com o nome "${nomeFormatado}".`, 409));
         }
 
-        next(error);
+        return next(error);
     }
 }
 

@@ -5,7 +5,7 @@ export const buscarDadosEmpresa = async (req, res, next) => {
     try {
         // Busca sempre o registro principal (ID 1)
         const empresa = await connection('dados_empresa').where('id', 1).first();
-        
+
         return res.status(200).json({
             status: 'success',
             data: empresa || null // Retorna null se ainda não houver cadastro
@@ -15,70 +15,37 @@ export const buscarDadosEmpresa = async (req, res, next) => {
     }
 };
 
-// export const salvarDadosEmpresa = async (req, res, next) => {
-//     const dados = req.body;
+export const buscarDadosEmpresaPublicos = async (req, res, next) => {
+    try {
+        const empresa = await connection('dados_empresa')
+            .where('id', 1)
+            .first(
+                'id',
+                'nome_fantasia',
+                'telefone_empresa',        
+                'email_empresa',
+                'logradouro',
+                'numero',
+                'complemento',
+                'bairro',
+                'cidade',
+                'estado',
+                'cep',
+            );
 
-//     if (!dados.cnpj || !isValidCNPJ(dados.cnpj)) {
-//         return res.status(400).json({
-//             status: 'error',
-//             message: 'O CNPJ informado é inválido ou está em branco.'
-//         });
-//     }
-
-//     // 2. Valida CPF (Opcional - só valida se estiver preenchido)
-//     if (dados.cpf_proprietario && dados.cpf_proprietario.trim() !== "") {
-//         if (!isValidCPF(dados.cpf_proprietario)) {
-//             return res.status(400).json({
-//                 status: 'error',
-//                 message: 'O CPF do proprietário informado é inválido.'
-//             });
-//         }
-//     }
-    
-//     try {
-//         const empresaExistente = await connection('dados_empresa').where('id', 1).first();
-        
-//         // Garante que o atualizado_em seja sempre a data de agora na edição
-//         const payload = {
-//             ...dados,
-//             atualizado_em: connection.fn.now()
-//         };
-
-//         if (empresaExistente) {
-//             // Se já existe, faz o UPDATE
-//             const [empresaAtualizada] = await connection('dados_empresa')
-//                 .where('id', 1)
-//                 .update(payload)
-//                 .returning('*');
-                
-//             return res.status(200).json({
-//                 status: 'success',
-//                 message: 'Dados da empresa atualizados com sucesso.',
-//                 data: empresaAtualizada
-//             });
-//         } else {
-//             // Se não existe, cria forçando o ID 1 e remove atualizado_em do insert inicial se preferir
-//             delete payload.atualizado_em;
-            
-//             const [novaEmpresa] = await connection('dados_empresa')
-//                 .insert({ ...payload, id: 1 })
-//                 .returning('*');
-                
-//             return res.status(201).json({
-//                 status: 'success',
-//                 message: 'Dados da empresa cadastrados com sucesso.',
-//                 data: novaEmpresa
-//             });
-//         }
-//     } catch (error) {
-//         next(error);
-//     }
-// };
+        return res.status(200).json({
+            status: 'success',
+            data: empresa || null
+        });
+    } catch (error) {
+        next(error);
+    }
+};
 
 export const salvarDadosEmpresa = async (req, res, next) => {
     const dados = req.body;
-    const usuarioId = req.usuario?.id || null; 
-    
+    const usuarioId = req.usuario?.id || null;
+
     if (dados.cnpj && dados.cnpj.trim() !== "") {
         if (!isValidCNPJ(dados.cnpj)) {
             return res.status(400).json({
@@ -99,7 +66,7 @@ export const salvarDadosEmpresa = async (req, res, next) => {
 
     try {
         const empresaExistente = await connection('dados_empresa').where('id', 1).first();
-        
+
         const payload = {
             ...dados,
             atualizado_em: connection.fn.now()
@@ -117,7 +84,7 @@ export const salvarDadosEmpresa = async (req, res, next) => {
                 .where('id', 1)
                 .update(payload)
                 .returning('*');
-                
+
             empresaRetorno = empresaAtualizada;
             logAcao = 'ATUALIZAR_EMPRESA';
             logDescricao = `Configurações da empresa (${dados.nome_fantasia}) foram atualizadas.`;
@@ -125,12 +92,12 @@ export const salvarDadosEmpresa = async (req, res, next) => {
             mensagemSucesso = 'Dados da empresa atualizados com sucesso.';
         } else {
             // Se não existe, cria (INSERT)
-            delete payload.atualizado_em; 
-            
+            delete payload.atualizado_em;
+
             const [novaEmpresa] = await connection('dados_empresa')
                 .insert({ ...payload, id: 1 })
                 .returning('*');
-                
+
             empresaRetorno = novaEmpresa;
             logAcao = 'CADASTRAR_EMPRESA';
             logDescricao = `Configurações da empresa (${dados.nome_fantasia}) foram cadastradas pela primeira vez.`;
