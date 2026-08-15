@@ -34,6 +34,15 @@ dotenv.config();
 
 const app = express();
 
+/**
+ * A aplicação em produção fica atrás do proxy reverso da hospedagem.
+ * Isso permite que o Express identifique corretamente o IP original
+ * utilizado pelo rate limiter.
+ */
+if (process.env.NODE_ENV === 'production') {
+    app.set('trust proxy', 1);
+}
+
 const allowedOrigins = process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(',')
     : [];

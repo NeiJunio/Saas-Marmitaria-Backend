@@ -8,16 +8,19 @@ export default async function errorHandler(err, req, res, next) {
     const status = statusCode >= 500 ? 'error' : 'fail';
     const timestamp = new Date().toISOString();
 
+    const resposta = { status, message };
+
+    // Apenas erros estruturados e explicitamente liberados expõem código e detalhes para o Frontend.
+    if (err.exposeDetails === true && err.code) resposta.code = err.code;
+    if (err.exposeDetails === true && err.details) resposta.details = err.details;
+
     // Erros de regra de negócio são esperados e não representam falha interna do sistema.
     if (statusCode < 500) {
         if (statusCode === 409) {
             console.warn(`${logSymbols.warning} ${chalk.yellow(`[${timestamp}] Conflito em ${req.method} ${req.originalUrl}: ${message}`)}`);
         }
 
-        return res.status(statusCode).json({
-            status,
-            message
-        });
+        return res.status(statusCode).json(resposta);
     }
 
     // Somente erros internos reais são registrados como erro no terminal e no banco.
@@ -35,6 +38,8 @@ export default async function errorHandler(err, req, res, next) {
             acao: 'SISTEMA.ERRO',
             descricao: message,
             payload: JSON.stringify({
+                code: err.code || null,
+                details: err.details || null,
                 stack: process.env.NODE_ENV === 'production' ? '🔒' : err.stack,
                 body: req.body,
                 params: req.params,
@@ -45,8 +50,5 @@ export default async function errorHandler(err, req, res, next) {
         console.error(`${logSymbols.warning} ${chalk.yellow('Falha ao gravar log de erro no banco:')} ${dbError.message}`);
     }
 
-    return res.status(statusCode).json({
-        status,
-        message
-    });
+    return res.status(statusCode).json(resposta);
 }

@@ -8,7 +8,9 @@ import {
     inserirProdutosPedido,
     normalizarTelefone,
     selecionarMarmitasJson,
-    selecionarProdutosJson
+    selecionarProdutosJson,
+    validarLojaAberta,
+    validarMetodoPagamento
 } from "../utils/pedidosUtils.js";
 
 export const criarPedido = async (req, res, next) => {
@@ -29,7 +31,33 @@ export const criarPedido = async (req, res, next) => {
             produtos = []
         } = req.body || {};
 
-        const valorTrocoNumerico = precisa_troco && troco_para ? Number(troco_para) : null;
+        const observacoesFormatadas = observacoes === null || observacoes === undefined ? null : String(observacoes).trim() || null;
+
+        if (observacoesFormatadas && observacoesFormatadas.length > 60) {
+            lancarErro("As observações do pedido devem possuir no máximo 60 caracteres.", 400);
+        }
+
+        // const valorTrocoNumerico = precisa_troco && troco_para !== null && troco_para !== undefined && String(troco_para).trim() !== '' ? Number(troco_para) : null;
+
+        // if (precisa_troco && (!Number.isFinite(valorTrocoNumerico) || valorTrocoNumerico <= 0)) {
+        //     lancarErro("Informe um valor válido para o troco.", 400);
+        // }
+
+        const trocoOriginal = troco_para !== null && troco_para !== undefined ? String(troco_para).trim() : '';
+
+        const valorTrocoNumerico = precisa_troco && trocoOriginal !== '' ? Number(trocoOriginal.replace(',', '.')) : null;
+
+        if (precisa_troco) {
+            const totalDigitosTroco = trocoOriginal.replace(/\D/g, '').length;
+
+            if (totalDigitosTroco === 0 || totalDigitosTroco > 7) {
+                lancarErro("O valor do troco deve possuir no máximo 7 dígitos.", 400);
+            }
+
+            if (!Number.isFinite(valorTrocoNumerico) || valorTrocoNumerico <= 0) {
+                lancarErro("Informe um valor válido para o troco.", 400);
+            }
+        }
 
         if (!Array.isArray(marmitas) || !Array.isArray(produtos)) {
             lancarErro("Marmitas e produtos devem ser enviados como listas.", 400);
@@ -45,11 +73,15 @@ export const criarPedido = async (req, res, next) => {
             lancarErro("O endereço é obrigatório para pedidos com entrega.", 400);
         }
 
-        const enderecoFinal = metodo_entrega === "Retirada" 
-            ? null 
+        const enderecoFinal = metodo_entrega === "Retirada"
+            ? null
             : String(endereco_cliente || "").trim() || null;
 
         trx = await connection.transaction();
+
+        // Revalida as regras críticas no momento exato da criação do pedido.
+        await validarLojaAberta(trx);
+        await validarMetodoPagamento(metodo_pagamento_id, trx);
 
         const [pedido] = await connection("pedidos")
             .transacting(trx)
@@ -62,14 +94,14 @@ export const criarPedido = async (req, res, next) => {
                 metodo_pagamento_id,
                 status: "Pendente",
                 valor_total: 0,
-                observacoes,
+                observacoes: observacoesFormatadas,
                 precisa_troco: Boolean(precisa_troco),
                 troco_para: valorTrocoNumerico,
             })
             .returning("*");
 
         const totalMarmitasCentavos = await inserirMarmitasPedido({ pedidoId: pedido.id, marmitas, trx });
-        const totalProdutosCentavos = await inserirProdutosPedido({ pedidoId: pedido.id, produtos, trx });
+        const totalProdutosCentavos = await inserirProdutosPedido({ pedidoId: pedido.id, produtos, trx, exigirPrecoReferencia: !req.usuario });
         const valorTotalCentavos = totalMarmitasCentavos + totalProdutosCentavos;
         const valorTotalPedido = deCentavos(valorTotalCentavos);
 
