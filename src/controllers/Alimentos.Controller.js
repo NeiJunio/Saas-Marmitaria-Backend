@@ -131,11 +131,21 @@ export const listarAlimentosAdmin = async (req, res, next) => {
                 'a.categoria_id',
                 'a.disponivel_hoje',
                 'a.deletado_em',
-                'c.nome as categoria_nome'
+                'c.nome as categoria_nome',
+                'c.deletado_em as categoria_deletada_em' // Adiciona o campo deletado_em da categoria
             ]);
 
-        if (excluidos === 'false') query.whereNull('a.deletado_em');
-        if (excluidos === 'true') query.whereNotNull('a.deletado_em');
+        if (excluidos === 'false') {
+            query.whereNull('a.deletado_em');
+            query.whereNull('c.deletado_em'); // Garante que a categoria também não esteja excluída
+        }
+        if (excluidos === 'true') {
+            // Traz alimentos deletados OU que pertencem a categorias deletadas
+            query.where(function() {
+                this.whereNotNull('a.deletado_em')
+                    .orWhereNotNull('c.deletado_em'); // ou .orWhere('c.ativo', false)
+            });
+        }
 
         if (search) {
             query.andWhere(function () {
@@ -566,9 +576,11 @@ export const listarCardapioParaCliente = async (req, res, next) => {
                 'a.nome',
                 'a.descricao',
                 'c.limite_escolhas',
-                'c.nome as categoria_nome'
+                'c.nome as categoria_nome',
+                'c.deletado_em as categoria_deletada_em' // Adiciona o campo deletado_em da categoria
             ])
             .where('a.disponivel_hoje', true)
+            .whereNull('c.deletado_em') // Garante que a categoria não esteja deletada
             .whereNull('a.deletado_em')
             .where('a.disponivel_hoje', true)
             .orderBy('c.id', 'ASC')
