@@ -17,6 +17,7 @@ import RelatoriosRoutes from './routes/Relatorios.Routes.js'
 import KeepAliveRoutes from './routes/KeepAlive.Routes.js'
 import DadosEmpresaRoutes from './routes/DadosEmpresa.Routes.js'
 import QzRoutes from './routes/Qz.Routes.js'
+import DashboardRoutes from './routes/Dashboard.Routes.js'
 
 // Novos módulos de produtos.
 import CategoriasProdutosRoutes from './routes/CategoriaProduto.Routes.js';
@@ -91,6 +92,7 @@ app.use('/status-loja', StatusLojaRoutes)
 app.use('/tamanhos-marmitas', TamanhosMarmitasRoutes)
 app.use('/usuarios', UsuariosRoutes)
 app.use('/relatorios', RelatoriosRoutes)
+app.use('/dashboard', DashboardRoutes)
 
 // Novas APIs.
 app.use('/categorias-produtos', CategoriasProdutosRoutes);
